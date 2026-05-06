@@ -483,7 +483,7 @@ display(Markdown(final["generation"]))
 
 ## 8. Project File Structure
 
-```
+```mermaid
 %%{init: {
   "theme": "dark",
   "themeVariables": {
@@ -530,7 +530,8 @@ flowchart TD
   classDef root fill:#e0b12d,stroke:#e0b12d,color:#111111,stroke-width:2px;
   classDef folder fill:#1a3f8f,stroke:#2b6cff,color:#eaf1ff,stroke-width:2px;
   classDef file fill:#0f1a2b,stroke:#2b6cff,color:#cfe0ff,stroke-width:1px;
-  classDef planned fill:#1b1b1b,stroke:#6b6b6b,color:#cfcfcf,stroke-dasharray: 6 4;              # [PLANNED] Streamlit research dashboard
+  classDef planned fill:#1b1b1b,stroke:#6b6b6b,color:#cfcfcf,stroke-dasharray: 6 4;
+  
 ```
 
 ---
