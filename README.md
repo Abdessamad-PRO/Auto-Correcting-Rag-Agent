@@ -49,13 +49,13 @@ graph TD
     C["grade_documents\nLLM grades each document\nComputes relevant_fraction\nWrites relevance_decision"]
     C --> D
 
-    D{"route_after_grading\nrelevance_decision?\nloop_step >= 3?"}
+    D{"route_after_grading\nCheck relevance_decision\nand loop_step"}
 
-    D -- "relevant_fraction >= 0.5 OR loop_step >= MAX" --> E
-    D -- "relevant_fraction < 0.5 AND loop_step < MAX" --> F
+    D -->|"relevant_fraction above 0.5 OR loop_step at MAX"| E
+    D -->|"relevant_fraction below 0.5 AND loop_step below MAX"| F
 
     F["transform_query\nLLM rewrites query\nGCN and EEG vocabulary enrichment"]
-    F -- "Loop back - max 3 iterations" --> B
+    F -->|"Loop back - max 3 iterations"| B
 
     E["generate\nFilters relevant docs\nSynthesises academic answer"]
     E --> G([END])
@@ -87,14 +87,14 @@ graph TD
     end
 
     subgraph ROUTER["Conditional Edge: route_after_grading"]
-        RT1{"loop_step >= MAX_RETRIEVE_ITERATIONS?"}
-        RT2{"relevant_fraction >= RELEVANCE_THRESHOLD?"}
+        RT1{"loop_step at MAX_RETRIEVE_ITERATIONS"}
+        RT2{"relevant_fraction above RELEVANCE_THRESHOLD"}
         RT3["Route to generate"]
         RT4["Route to transform_query"]
-        RT1 -- "Yes" --> RT3
-        RT1 -- "No" --> RT2
-        RT2 -- "Yes" --> RT3
-        RT2 -- "No" --> RT4
+        RT1 -->|Yes| RT3
+        RT1 -->|No| RT2
+        RT2 -->|Yes| RT3
+        RT2 -->|No| RT4
     end
 
     subgraph TRANSFORM_NODE["Node: transform_query"]
@@ -154,9 +154,9 @@ graph LR
     end
 
     P1D --> P2A
-    P2C -- "Insufficient - fraction below 0.5" --> P3A
-    P2C -- "Sufficient - fraction above 0.5" --> P4A
-    P3C -- "Re-query" --> P1B
+    P2C -->|"Insufficient - fraction below 0.5"| P3A
+    P2C -->|"Sufficient - fraction above 0.5"| P4A
+    P3C -->|"Re-query"| P1B
 ```
 
 ### 2.2 Document Retrieval Strategy
@@ -219,7 +219,7 @@ graph TD
         S3["documents: List[Document]\nRaw retrieval output"]
         S4["graded_documents: List[GradedDocument]\nAnnotated with relevance + score"]
         S5["generation: Optional[str]\nFinal synthesised answer"]
-        S6["loop_step: int\nCycle counter — MAX: 3"]
+        S6["loop_step: int\nCycle counter - MAX: 3"]
         S7["relevance_decision: Optional[Literal]\n'generate' | 'transform_query'"]
         S8["error: Optional[str]\nObservability field"]
     end
@@ -252,19 +252,19 @@ graph TD
 
 ```mermaid
 graph LR
-    subgraph "RelevanceGrade"
-        RG1["binary_score: str\n'yes' | 'no'"]
-        RG2["confidence: float\n[0.0, 1.0]"]
+    subgraph RG["RelevanceGrade"]
+        RG1["binary_score: str\n'yes' or 'no'"]
+        RG2["confidence: float\n0.0 to 1.0"]
         RG3["rationale: str\nOne-sentence justification"]
     end
 
-    subgraph "TransformedQuery"
+    subgraph TQ["TransformedQuery"]
         TQ1["improved_query: str\nEnriched reformulation"]
         TQ2["reasoning: str\nTransformation explanation"]
     end
 
-    GraderLLM["LLM + with_structured_output()"] --> RelevanceGrade
-    TransformerLLM["LLM + with_structured_output()"] --> TransformedQuery
+    GraderLLM["LLM + with_structured_output()"] --> RG1
+    TransformerLLM["LLM + with_structured_output()"] --> TQ1
 ```
 
 ### 4.2 LangChain Chain Architecture
@@ -292,19 +292,19 @@ Two independent safety mechanisms enforce the iteration cap, implementing a defe
 
 ```mermaid
 graph TD
-    A["grade_documents() executes"] --> B{"loop_step >= MAX_RETRIEVE_ITERATIONS\n(currently: 3)"}
-    B -- "YES" --> C["Write relevance_decision = 'generate'\n(regardless of corpus quality)"]
-    B -- "NO" --> D{"relevant_fraction >= RELEVANCE_THRESHOLD\n(currently: 0.5)"}
-    D -- "YES" --> E["Write relevance_decision = 'generate'"]
-    D -- "NO" --> F["Write relevance_decision = 'transform_query'"]
+    A["grade_documents() executes"] --> B{"loop_step at MAX_RETRIEVE_ITERATIONS\n(currently: 3)"}
+    B -->|YES| C["Write relevance_decision = 'generate'\n(regardless of corpus quality)"]
+    B -->|NO| D{"relevant_fraction above RELEVANCE_THRESHOLD\n(currently: 0.5)"}
+    D -->|YES| E["Write relevance_decision = 'generate'"]
+    D -->|NO| F["Write relevance_decision = 'transform_query'"]
 
     C --> G["route_after_grading() executes"]
     E --> G
     F --> G
 
-    G --> H{"REDUNDANT CHECK:\nloop_step >= MAX AND decision == 'transform_query'?"}
-    H -- "YES (override)" --> I["Return 'generate'\n⚠️ Safety override logged"]
-    H -- "NO" --> J["Return relevance_decision as-is"]
+    G --> H{"REDUNDANT CHECK:\nloop_step at MAX AND decision is transform_query"}
+    H -->|"YES - override"| I["Return 'generate'\nSafety override logged"]
+    H -->|NO| J["Return relevance_decision as-is"]
 
     style C fill:#c84b31,color:#fff
     style I fill:#c84b31,color:#fff
@@ -512,22 +512,22 @@ research_agent/
 
 ```mermaid
 graph LR
-    subgraph "Phase 1 — Foundation (COMPLETE)"
+    subgraph "Phase 1 - Foundation (COMPLETE)"
         P1A["✅ state.py\nAgentState + TypedDict"]
         P1B["✅ nodes.py\n4 node functions"]
         P1C["✅ workflow.py\nGraph assembly + CLI"]
     end
 
-    subgraph "Phase 2 — Data (IN PROGRESS)"
+    subgraph "Phase 2 - Data (IN PROGRESS)"
         P2A["⚡ ingest.py\nCorpus ingestion pipeline\nArxiv + PDF loaders\nChromaDB population"]
     end
 
-    subgraph "Phase 3 — Quality Assurance"
+    subgraph "Phase 3 - Quality Assurance"
         P3A["🔲 tests/\nUnit + integration tests\npytest + mock LLM"]
         P3B["🔲 eval/\nRAGAS evaluation\nFaithfulness + Precision"]
     end
 
-    subgraph "Phase 4 — Interface"
+    subgraph "Phase 4 - Interface"
         P4A["🔲 app.py\nStreamlit dashboard\nReal-time node trace\nSource visualisation"]
     end
 
