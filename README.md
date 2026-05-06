@@ -491,11 +491,9 @@ display(Markdown(final["generation"]))
     "primaryColor": "#e0b12d",
     "primaryTextColor": "#111111",
     "primaryBorderColor": "#e0b12d",
-
     "secondaryColor": "#2b6cff",
     "secondaryTextColor": "#d7e3ff",
     "secondaryBorderColor": "#2b6cff",
-
     "lineColor": "#2a2a2a",
     "textColor": "#cfcfcf",
     "fontFamily": "Inter, ui-sans-serif, system-ui, Arial"
@@ -504,34 +502,32 @@ display(Markdown(final["generation"]))
 }}%%
 
 flowchart TD
-  ROOT([Auto-Correcting<br/>Academic Research Agent]):::root
-
+  ROOT([Auto-Correcting Academic Research Agent]):::root
   ROOT --> RA[research_agent/]:::folder
 
-  RA --> STATE[state.py<br/><span style="font-size:12px">AgentState TypedDict, GradedDocument, constants</span>]:::file
-  RA --> NODES[nodes.py<br/><span style="font-size:12px">Node functions, schemas, prompts</span>]:::file
-  RA --> WF[workflow.py<br/><span style="font-size:12px">Graph assembly, routing, CLI</span>]:::file
+  RA --> STATE["state.py\nAgentState TypedDict, GradedDocument, constants"]:::file
+  RA --> NODES["nodes.py\nNode functions, schemas, prompts"]:::file
+  RA --> WF["workflow.py\nGraph assembly, routing, CLI"]:::file
 
-  RA --> CONTEXT[CONTEXT.md<br/><span style="font-size:12px">Persistent session memory</span>]:::file
-  RA --> README[README.md<br/><span style="font-size:12px">Project documentation</span>]:::file
+  RA --> CONTEXT["CONTEXT.md\nPersistent session memory"]:::file
+  RA --> README["README.md\nProject documentation"]:::file
 
-  RA --> ENV[.env<br/><span style="font-size:12px">Environment variables (gitignored)</span>]:::file
-  RA --> ENVEX[.env.example<br/><span style="font-size:12px">Environment template</span>]:::file
-  RA --> REQ[requirements.txt<br/><span style="font-size:12px">Python dependencies</span>]:::file
-  RA --> GI[.gitignore<br/><span style="font-size:12px">Ignores .env, chroma_db/, __pycache__/, .venv/</span>]:::file
+  RA --> ENV[".env\nEnvironment variables (gitignored)"]:::file
+  RA --> ENVEX[".env.example\nEnvironment template"]:::file
+  RA --> REQ["requirements.txt\nPython dependencies"]:::file
+  RA --> GI[".gitignore\nIgnores .env, chroma_db/, __pycache__/, .venv/"]:::file
 
-  RA --> CHROMA[chroma_db/<br/><span style="font-size:12px">ChromaDB persistence (gitignored)</span>]:::folder
+  RA --> CHROMA["chroma_db/\nChromaDB persistence (gitignored)"]:::folder
 
-  RA --> ING[ingest.py<br/><span style="font-size:12px">[PLANNED] Corpus ingestion pipeline</span>]:::planned
+  RA --> ING["ingest.py\n[PLANNED] Corpus ingestion pipeline"]:::planned
   RA --> EVAL[eval/]:::folder
-  EVAL --> EVALPY[evaluate.py<br/><span style="font-size:12px">[PLANNED] RAGAS evaluation</span>]:::planned
-  RA --> APP[app.py<br/><span style="font-size:12px">[PLANNED] Streamlit dashboard</span>]:::planned
+  EVAL --> EVALPY["evaluate.py\n[PLANNED] RAGAS evaluation"]:::planned
+  RA --> APP["app.py\n[PLANNED] Streamlit dashboard"]:::planned
 
   classDef root fill:#e0b12d,stroke:#e0b12d,color:#111111,stroke-width:2px;
   classDef folder fill:#1a3f8f,stroke:#2b6cff,color:#eaf1ff,stroke-width:2px;
   classDef file fill:#0f1a2b,stroke:#2b6cff,color:#cfe0ff,stroke-width:1px;
   classDef planned fill:#1b1b1b,stroke:#6b6b6b,color:#cfcfcf,stroke-dasharray: 6 4;
-  
 ```
 
 ---
