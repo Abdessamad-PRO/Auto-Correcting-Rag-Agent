@@ -1,593 +1,353 @@
 # Auto-Correcting Academic Research Agent
-### A Self-Reflective Agentic RAG System for Graph Convolutional Network Literature Synthesis in EEG Signal Decoding
+### A Self-Reflective Agentic RAG System with Multi-Provider LLM, Web-Search Augmentation, Human-in-the-Loop, and an Angular MVVM Workspace
 
 > **Institution:** École Normale Supérieure de l'Enseignement Technique (ENSET)
 > **Programme:** Master's Degree — Distributed Systems and Artificial Intelligence
 > **Domain:** Graph Convolutional Networks (GCN) · Electroencephalography (EEG) · Brain-Computer Interfaces (BCI)
-> **Framework:** LangGraph · LangChain · ChromaDB · OpenAI GPT-4o
+> **Stack:** LangGraph · LangChain · ChromaDB · FastAPI · uv · Angular 21 · Tailwind v4
 
 ---
 
 ## Abstract
 
-The exponential growth of scientific literature in the field of Graph Neural Networks applied to biosignal processing presents a substantial information retrieval challenge for academic researchers. Standard Retrieval-Augmented Generation (RAG) pipelines operate in a single-pass, open-loop fashion: a query is issued, documents are retrieved, and a response is synthesised irrespective of the semantic quality of the retrieved corpus. This architectural limitation is particularly acute in highly specialised domains — such as Graph Convolutional Networks (GCN) for EEG signal decoding — where naive vector similarity search frequently surfaces tangentially related documents that fail to address the precise technical sub-question posed by the researcher.
+The exponential growth of scientific literature in Graph Neural Networks applied to biosignal processing presents a substantial information-retrieval challenge for academic researchers. Standard Retrieval-Augmented Generation (RAG) pipelines operate in a single-pass open-loop fashion: a query is issued, documents are retrieved, and a response is synthesised irrespective of the semantic quality of the retrieved corpus. This architectural limitation is particularly acute in highly specialised domains — such as Graph Convolutional Networks (GCN) for EEG signal decoding — where naive vector similarity search frequently surfaces tangentially related documents that fail to address the precise technical sub-question posed by the researcher.
 
-This report presents the design and implementation of an **Auto-Correcting Academic Research Agent**, a closed-loop, self-reflective agentic system that overcomes this limitation through iterative corpus quality assessment and autonomous query reformulation. The system is orchestrated by LangGraph and operates as a directed cyclic graph comprising four specialised nodes: a **Retriever**, a **Grader**, a **Query Transformer**, and a **Generator**. An LLM-powered relevance grader evaluates each retrieved document against the current research question, computing a binary relevance verdict and a continuous confidence score. When the fraction of relevant documents falls below a configurable threshold, the workflow does not proceed to synthesis; instead, a Query Transformation node leverages large language model reasoning to produce a semantically enriched reformulation that targets more specific vocabulary within the GCN and EEG literature. This Retrieve → Grade → Transform cycle repeats until either the corpus quality threshold is satisfied or a hard iteration cap (maximum three cycles) is reached, at which point the Generator synthesises a rigorous academic answer grounded exclusively in the available relevant context.
-
-The architecture demonstrates how agentic feedback loops and structured LLM outputs can be composed to produce a research assistant capable of self-correcting its information retrieval strategy — a property critical for the demands of postgraduate academic research.
+This report presents the **Auto-Correcting Academic Research Agent**, a closed-loop, self-reflective agentic system that overcomes this limitation through iterative corpus quality assessment, autonomous query reformulation, **live web-search augmentation** when the local corpus is exhausted, and a **human-in-the-loop safety gate** before any potentially risky answer is committed. The orchestration is implemented in LangGraph as a directed cyclic graph; the system is exposed as a FastAPI service with a typed REST surface and Server-Sent Events streaming, and is consumed by an Angular MVVM workspace that visualises every node of the graph in real time. A pluggable LLM factory selects between **Google Gemini**, **OpenAI**, or **xAI Grok** at startup based on which API key is present in `.env`, so the same codebase ships with three interchangeable cognitive backends.
 
 ---
 
 ## Table of Contents
 
-1. [Architecture Overview](#1-architecture-overview)
-2. [Methodology](#2-methodology)
-3. [State Management](#3-state-management)
-4. [Component Specification](#4-component-specification)
-5. [Safety and Control Mechanisms](#5-safety-and-control-mechanisms)
-6. [Setup and Configuration](#6-setup-and-configuration)
-7. [Usage](#7-usage)
-8. [Project File Structure](#8-project-file-structure)
-9. [Roadmap](#9-roadmap)
-10. [References](#10-references)
+1. [System Architecture](#1-system-architecture)
+2. [Agent Workflow (LangGraph)](#2-agent-workflow-langgraph)
+3. [Backend (FastAPI + uv)](#3-backend-fastapi--uv)
+4. [Frontend (Angular MVVM)](#4-frontend-angular-mvvm)
+5. [Multi-provider LLM](#5-multi-provider-llm)
+6. [Tools — Vector + Web Search](#6-tools--vector--web-search)
+7. [Human-in-the-loop](#7-human-in-the-loop)
+8. [Prompt A/B Evaluation](#8-prompt-ab-evaluation)
+9. [Setup & Running the Stack](#9-setup--running-the-stack)
+10. [Project File Structure](#10-project-file-structure)
+11. [API Surface](#11-api-surface)
+12. [Safety & Observability](#12-safety--observability)
+13. [Roadmap](#13-roadmap)
 
 ---
 
-## 1. Architecture Overview
+## 1. System Architecture
 
-The system is implemented as a **LangGraph StateGraph** — a directed graph whose nodes are stateless Python functions and whose edges encode the control flow of the agent. The graph state is a `TypedDict` (`AgentState`) that serves as the canonical communication channel between all nodes.
+The system is composed of three independently deployable layers:
 
-### 1.1 High-Level Workflow Diagram
-
-```mermaid
-graph TD
-    A([START]) --> B
-
-    B["retrieve\nChromaDB MMR Search\nIncrements loop_step"]
-    B --> C
-
-    C["grade_documents\nLLM grades each document\nComputes relevant_fraction\nWrites relevance_decision"]
-    C --> D
-
-    D{"route_after_grading\nCheck relevance_decision\nand loop_step"}
-
-    D -->|"relevant_fraction above 0.5 OR loop_step at MAX"| E
-    D -->|"relevant_fraction below 0.5 AND loop_step below MAX"| F
-
-    F["transform_query\nLLM rewrites query\nGCN and EEG vocabulary enrichment"]
-    F -->|"Loop back - max 3 iterations"| B
-
-    E["generate\nFilters relevant docs\nSynthesises academic answer"]
-    E --> G([END])
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Angular 21 MVVM Workspace (auto-corrector-rag-frontend)            │
+│  • Workspace / Library / System-Health pages (lazy-loaded)          │
+│  • Signal-based ViewModels (agent-session, library, evaluation, …) │
+│  • SSE EventSource client for live agent traces                     │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │  REST + SSE  (proxied through /api)
+┌──────────────────────────────▼──────────────────────────────────────┐
+│  FastAPI Backend (backend/)                                         │
+│  controllers → services → repositories → models   (layered)         │
+│  • Multi-provider LLM factory (Gemini / OpenAI / Grok)              │
+│  • LangGraph workflow with checkpointed sessions                    │
+│  • Web search tool (DuckDuckGo / Tavily)                            │
+│  • PDF ingestion pipeline                                           │
+│  • A/B prompt evaluation (LLM-as-judge)                             │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+┌──────────────────────────────▼──────────────────────────────────────┐
+│  ChromaDB persistent vector store + ./chroma_db                     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 1.2 Detailed Node and Edge Specification
+### 1.1 Backend layered architecture
 
-```mermaid
-graph TD
-    subgraph INIT["Initialisation"]
-        I1["_build_initial_state"]
-        I2["question, loop_step=0, generation=None"]
-        I1 --> I2
-    end
-
-    subgraph RETRIEVE_NODE["Node: retrieve"]
-        R1["vectorstore MMR search"]
-        R2["search_type=mmr, fetch_k=TOP_K*3, lambda_mult=0.7"]
-        R3["Output: documents list, loop_step incremented"]
-        R1 --> R2 --> R3
-    end
-
-    subgraph GRADE_NODE["Node: grade_documents"]
-        G1["grader_chain.invoke per document"]
-        G2["RelevanceGrade: binary_score, confidence, rationale"]
-        G3["relevant_fraction = n_relevant divided by n_total"]
-        G4["Output: graded_documents, relevance_decision"]
-        G1 --> G2 --> G3 --> G4
-    end
-
-    subgraph ROUTER["Conditional Edge: route_after_grading"]
-        RT1{"loop_step at MAX_RETRIEVE_ITERATIONS"}
-        RT2{"relevant_fraction above RELEVANCE_THRESHOLD"}
-        RT3["Route to generate"]
-        RT4["Route to transform_query"]
-        RT1 -->|Yes| RT3
-        RT1 -->|No| RT2
-        RT2 -->|Yes| RT3
-        RT2 -->|No| RT4
-    end
-
-    subgraph TRANSFORM_NODE["Node: transform_query"]
-        T1["transformer_chain.invoke"]
-        T2["Output: TransformedQuery - improved_query, reasoning"]
-        T3["State: question updated, original_question IMMUTABLE"]
-        T1 --> T2 --> T3
-    end
-
-    subgraph GENERATE_NODE["Node: generate"]
-        GN1["Filter graded_docs where relevance=relevant"]
-        GN2["Format context with source metadata"]
-        GN3["generator_chain.invoke"]
-        GN4["Output: generation - synthesised academic answer"]
-        GN1 --> GN2 --> GN3 --> GN4
-    end
-
-    INIT --> RETRIEVE_NODE
-    RETRIEVE_NODE --> GRADE_NODE
-    GRADE_NODE --> ROUTER
-    RT3 --> GENERATE_NODE
-    RT4 --> TRANSFORM_NODE
-    TRANSFORM_NODE --> RETRIEVE_NODE
 ```
+backend/src/rag_agent/
+├── core/             config, logging, multi-provider LLM/embedding factories
+├── models/           Pydantic DTOs + LangGraph TypedDict state
+├── repositories/     ChromaDB vector access + PDF document loader
+├── services/         business logic
+│   ├── tools/        web_search.py · vector_search.py
+│   ├── prompts.py    centralised templates
+│   ├── chains.py     LLM chain factories
+│   ├── nodes.py      LangGraph node functions
+│   ├── workflow.py   StateGraph assembly + routers
+│   ├── agent_service.py
+│   ├── ingestion_service.py
+│   └── evaluation_service.py
+└── controllers/      health · agent · ingest · evaluate routers
+```
+
+### 1.2 Frontend MVVM layers
+
+```
+auto-corrector-rag-frontend/src/app/
+├── core/        ─── Model layer (DTOs, HTTP/SSE services, signal stores)
+├── features/    ─── View layer (Workspace · Library · System Health pages)
+└── shared/      ─── chrome (TopAppBar, SideNav, StatusFooter, Shell)
+```
+
+The boundary is enforced: a feature component reads signals from its store
+and emits intent (method calls). It never imports an HTTP service directly.
 
 ---
 
-## 2. Methodology
-
-### 2.1 Self-Reflective Retrieval-Augmented Generation
-
-Standard RAG pipelines follow a deterministic, open-loop sequence: embed the query, retrieve top-k nearest neighbours, concatenate context, and generate. This architecture is computationally efficient but epistemically fragile. In domains characterised by dense, overlapping terminology — such as the intersection of spectral graph theory and neurophysiological signal processing — lexical similarity between query and document embeddings does not reliably predict semantic utility for a given research sub-question.
-
-The Self-Reflective RAG methodology introduced in this project addresses this limitation by introducing an **epistemic quality assessment layer** between retrieval and generation. The methodology proceeds as follows:
+## 2. Agent Workflow (LangGraph)
 
 ```mermaid
-graph LR
-    subgraph P1["Phase 1 - Retrieval"]
-        P1A["User Query"] --> P1B["Dense Vector Embedding"]
-        P1B --> P1C["MMR Search - ChromaDB"]
-        P1C --> P1D["Candidate Documents"]
-    end
-
-    subgraph P2["Phase 2 - Grading"]
-        P2A["Document and Query sent to LLM Grader"] --> P2B["RelevanceGrade - Pydantic"]
-        P2B --> P2C{"Quality Assessment"}
-    end
-
-    subgraph P3["Phase 3a - Transformation if needed"]
-        P3A["Original and Current Query sent to LLM"] --> P3B["TransformedQuery - Pydantic"]
-        P3B --> P3C["Enriched Query - GCN and EEG vocabulary"]
-    end
-
-    subgraph P4["Phase 3b - Generation if sufficient"]
-        P4A["Relevant Docs - filtered"] --> P4B["Generator LLM - GPT-4o"]
-        P4B --> P4C["Academic Synthesis"]
-    end
-
-    P1D --> P2A
-    P2C -->|"Insufficient - fraction below 0.5"| P3A
-    P2C -->|"Sufficient - fraction above 0.5"| P4A
-    P3C -->|"Re-query"| P1B
+graph TD
+    S([START]) --> P[plan_research<br/>Decompose into 3–7 steps]
+    P --> R[retrieve<br/>ChromaDB MMR · loop_step++]
+    R --> G[grade_documents<br/>LLM relevance grader]
+    G -- relevant >= τ --> GEN[generate]
+    G -- relevant <  τ --> TQ[transform_query]
+    G -- empty / exhausted --> W[web_search<br/>DuckDuckGo / Tavily]
+    W --> GEN
+    TQ --> R
+    GEN --> REV[review_answer<br/>Faithfulness + safety review]
+    REV -- safe --> E([END])
+    REV -- risky --> HIL[human_in_the_loop<br/>interrupt → approve / edit / revise]
+    HIL -- approve / edit --> E
+    HIL -- revise --> R
 ```
 
-### 2.2 Document Retrieval Strategy
+Key properties:
 
-The retrieval node employs **Maximum Marginal Relevance (MMR)** search rather than pure cosine similarity search. MMR optimises a composite objective that balances relevance against intra-set diversity:
+- **`loop_step`** is incremented only in `retrieve` (RULE S-3 in `CONTEXT.md`),
+  capped by `MAX_RETRIEVE_ITERATIONS` (defense-in-depth in both the grader
+  and the router).
+- The decision to call `web_search` is taken when (a) the local retriever
+  returned zero results, or (b) the relevance threshold is still missed at
+  the final allowed retrieval iteration. This converts a dead-end loop into
+  a fall-back live search.
+- `review_answer` runs LLM-as-judge groundedness scoring and may set
+  `needs_human_review=True`, which routes to a `human_in_the_loop` node that
+  calls LangGraph's `interrupt()` API. The frontend resumes by posting a
+  `Command(resume=…)` through `/api/agent/resume/{thread_id}/stream`.
 
-```
-MMR(q, D, S) = argmax_{d ∈ D\S} [ λ · sim(q, d) − (1−λ) · max_{s ∈ S} sim(d, s) ]
-```
+---
 
-where `q` is the query embedding, `D` is the candidate document set, `S` is the set of already-selected documents, and `λ` (configured as `lambda_mult = 0.7`) controls the relevance-diversity trade-off. This is particularly important for broad academic queries that span multiple sub-topics (e.g., a question that simultaneously concerns spectral graph convolution, electrode topology, and motor imagery classification would, under pure similarity search, retrieve redundant chunks from a single highly similar paper).
+## 3. Backend (FastAPI + uv)
 
-### 2.3 LLM-Powered Relevance Grading
+Why **FastAPI** over Flask:
 
-The Grader node invokes a structured-output LLM chain for each candidate document. The grader is instantiated with `llm.with_structured_output(RelevanceGrade)`, which forces the model to emit a valid instance of the `RelevanceGrade` Pydantic schema:
+- Native `async` lets us stream SSE without thread-pool gymnastics.
+- Automatic OpenAPI/Swagger at `/docs` (useful for the Angular team and
+  for `openapi-typescript` codegen if desired).
+- Pydantic v2 DTOs mirror the LangGraph state cleanly.
 
-```python
-class RelevanceGrade(BaseModel):
-    binary_score: str      # "yes" | "no"
-    confidence: float      # ∈ [0.0, 1.0]
-    rationale: str         # one-sentence justification
-```
+Why **uv** over pip:
 
-The system prompt grounds the grader in the specific technical domain, enumerating explicit relevance criteria for GCN and EEG literature. This domain grounding is essential: without it, a general-purpose LLM grader would apply generic relevance heuristics that fail to distinguish between, for example, a paper on general graph attention networks (marginally relevant) and one specifically applying Chebyshev polynomial approximation to EEG electrode graphs (highly relevant).
+- Single-binary, lock-file-driven resolver (`uv.lock` is committed).
+- 10×+ faster cold installs in CI.
+- Built-in `uv run` task runner for the `rag-api` and `rag-ingest` console
+  scripts declared in `pyproject.toml`.
 
-### 2.4 Query Transformation via LLM Reasoning
+---
 
-When the graded corpus fails to meet the quality threshold, the Query Transformation node applies four evidence-based reformulation strategies:
+## 4. Frontend (Angular MVVM)
 
-| Strategy | Description | Example |
+The frontend is a deliberate, opinionated MVVM:
+
+| Layer | Where | Responsibility |
 |---|---|---|
-| **Terminology Expansion** | Replace generic terms with domain-specific synonyms | `"brain signals"` → `"EEG epochs / neural oscillations"` |
-| **Concept Decomposition** | Decompose composite questions into technical components | `"GCN for BCI"` → `"spectral graph convolution + motor imagery classification"` |
-| **Specificity Injection** | Add methodological qualifiers | `"graph neural network"` → `"Chebyshev polynomial graph convolution"` |
-| **Drift Correction** | Anchor to original intent if reformulation strays | Re-incorporate `original_question` framing |
+| **Model** | `core/models/*.ts` + `core/services/*.ts` | DTO shapes, HTTP / SSE calls — no UI awareness |
+| **ViewModel** | `core/state/*.store.ts` | Signal-based reactive state, derived `computed()` signals, action methods. One store per feature. |
+| **View** | `features/**/{page,components}` | Standalone components that render the ViewModel's signals; no direct API access |
 
-The transformer produces a `TransformedQuery` Pydantic object containing both the improved query and the reasoning behind the transformation — the latter being logged for observability and future evaluation.
+This separation lets the workspace `WorkspacePage` consume the same
+`AgentSessionStore` that drives the live trace and the HITL banner, with no
+parent/child glue code. The store is the single source of truth for the run.
 
-### 2.5 Academic Synthesis
-
-The Generator node implements a strict grounding policy: it selects exclusively the documents marked `relevance = "relevant"` by the Grader and formats them with their bibliographic metadata (`title`, `year`) to enable source attribution. The system prompt instructs the LLM to:
-
-1. Ground every claim in the provided context.
-2. Use precise academic language with appropriate hedging.
-3. Structure the response with introduction, body, and conclusion.
-4. Explicitly acknowledge knowledge gaps rather than hallucinating information.
-5. Cite sources by `title` and `year` from document metadata.
+The UI faithfully implements the supplied cyber-brutalist design system —
+sharp corners, hairline `border-outline-variant` dividers, the Source Serif
+4 body and Archivo Narrow technical labels, the scanline overlay on the
+right pane, and the `bg-surface-container-lowest` workspace canvas.
 
 ---
 
-## 3. State Management
+## 5. Multi-provider LLM
 
-The `AgentState` TypedDict is the **single source of truth** for all inter-node communication. LangGraph merges partial state updates returned by each node using its built-in reducer.
-
-```mermaid
-graph TD
-    subgraph "AgentState TypedDict"
-        S1["question: str\nCurrent query (mutable)"]
-        S2["original_question: str\nInitial query (IMMUTABLE)"]
-        S3["documents: List[Document]\nRaw retrieval output"]
-        S4["graded_documents: List[GradedDocument]\nAnnotated with relevance + score"]
-        S5["generation: Optional[str]\nFinal synthesised answer"]
-        S6["loop_step: int\nCycle counter - MAX: 3"]
-        S7["relevance_decision: Optional[Literal]\n'generate' | 'transform_query'"]
-        S8["error: Optional[str]\nObservability field"]
-    end
-
-    subgraph "GradedDocument TypedDict"
-        GD1["document: Document"]
-        GD2["relevance: 'relevant' | 'irrelevant'"]
-        GD3["score: float [0.0, 1.0]"]
-    end
-
-    S4 --> GD1
-    S4 --> GD2
-    S4 --> GD3
-```
-
-**State mutation policy per node:**
-
-| Node | Reads | Writes |
-|---|---|---|
-| `retrieve` | `question`, `loop_step` | `documents`, `loop_step`, `error` |
-| `grade_documents` | `question`, `documents`, `loop_step` | `graded_documents`, `relevance_decision` |
-| `transform_query` | `question`, `original_question` | `question`, `error` |
-| `generate` | `question`, `documents`, `graded_documents` | `generation`, `error` |
-
----
-
-## 4. Component Specification
-
-### 4.1 Pydantic Structured Output Schemas
-
-```mermaid
-graph LR
-    subgraph RG["RelevanceGrade"]
-        RG1["binary_score: str\n'yes' or 'no'"]
-        RG2["confidence: float\n0.0 to 1.0"]
-        RG3["rationale: str\nOne-sentence justification"]
-    end
-
-    subgraph TQ["TransformedQuery"]
-        TQ1["improved_query: str\nEnriched reformulation"]
-        TQ2["reasoning: str\nTransformation explanation"]
-    end
-
-    GraderLLM["LLM + with_structured_output()"] --> RG1
-    TransformerLLM["LLM + with_structured_output()"] --> TQ1
-```
-
-### 4.2 LangChain Chain Architecture
-
-```mermaid
-graph LR
-    subgraph "Grader Chain"
-        GP["grader_prompt\nChatPromptTemplate"] --> GL["llm\nChatOpenAI"] --> GS["with_structured_output\nRelevanceGrade"]
-    end
-
-    subgraph "Generator Chain"
-        NGP["generator_prompt\nChatPromptTemplate"] --> NGL["llm\nChatOpenAI"] --> NGS["StrOutputParser()"]
-    end
-
-    subgraph "Transformer Chain"
-        TP["transformer_prompt\nChatPromptTemplate"] --> TL["llm\nChatOpenAI"] --> TS["with_structured_output\nTransformedQuery"]
-    end
-```
-
----
-
-## 5. Safety and Control Mechanisms
-
-Two independent safety mechanisms enforce the iteration cap, implementing a defense-in-depth strategy:
-
-```mermaid
-graph TD
-    A["grade_documents() executes"] --> B{"loop_step at MAX_RETRIEVE_ITERATIONS\n(currently: 3)"}
-    B -->|YES| C["Write relevance_decision = 'generate'\n(regardless of corpus quality)"]
-    B -->|NO| D{"relevant_fraction above RELEVANCE_THRESHOLD\n(currently: 0.5)"}
-    D -->|YES| E["Write relevance_decision = 'generate'"]
-    D -->|NO| F["Write relevance_decision = 'transform_query'"]
-
-    C --> G["route_after_grading() executes"]
-    E --> G
-    F --> G
-
-    G --> H{"REDUNDANT CHECK:\nloop_step at MAX AND decision is transform_query"}
-    H -->|"YES - override"| I["Return 'generate'\nSafety override logged"]
-    H -->|NO| J["Return relevance_decision as-is"]
-
-    style C fill:#c84b31,color:#fff
-    style I fill:#c84b31,color:#fff
-```
-
-**Constants (defined in `state.py`):**
-
-| Constant | Value | Description |
-|---|---|---|
-| `MAX_RETRIEVE_ITERATIONS` | `3` | Hard cap on Retrieve → Grade → Rewrite cycles |
-| `RELEVANCE_THRESHOLD` | `0.5` | Minimum relevant document fraction to trigger generation |
-
----
-
-## 6. Setup and Configuration
-
-### 6.1 Prerequisites
-
-- Python 3.11 or higher
-- An OpenAI API key with access to `gpt-4o` and `text-embedding-3-small`
-- A populated ChromaDB corpus (see Corpus Ingestion in §9 Roadmap)
-
-### 6.2 Installation
+Set **one** of these in `backend/.env`:
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/<your-org>/research-agent.git
-cd research-agent
-
-# 2. Create and activate a virtual environment
-python -m venv .venv
-source .venv/bin/activate          # Linux / macOS
-# .venv\Scripts\activate.bat       # Windows CMD
-# .venv\Scripts\Activate.ps1       # Windows PowerShell
-
-# 3. Install dependencies
-pip install -r requirements.txt
+GEMINI_API_KEY=...        # → Gemini 1.5 Pro    + Gemini embeddings
+OPENAI_API_KEY=...        # → GPT-4o            + text-embedding-3-small
+GROK_API_KEY=...          # → Grok 2            + local HF embeddings
 ```
 
-**`requirements.txt`:**
-```
-langgraph>=0.2.0
-langchain>=0.2.0
-langchain-openai>=0.1.0
-langchain-community>=0.2.0
-langchain-core>=0.2.0
-chromadb>=0.5.0
-pydantic>=2.0.0
-python-dotenv>=1.0.0
-```
+The factory in [`backend/src/rag_agent/core/llm_factory.py`](backend/src/rag_agent/core/llm_factory.py)
+resolves the provider deterministically:
 
-### 6.3 Environment Configuration
+1. Explicit `LLM_PROVIDER=<name>` override (must match a present key).
+2. Otherwise the first non-empty key in the order **Gemini → OpenAI → Grok**.
 
-Create a `.env` file in the project root:
+Embeddings track the provider, with one important fallback: Grok exposes no
+embedding API, so it transparently falls back to a local
+`sentence-transformers/all-MiniLM-L6-v2` model so ingestion and retrieval
+keep working.
+
+---
+
+## 6. Tools — Vector + Web Search
+
+The agent does **not** rely on the local corpus alone. Two tools are wired:
+
+- `services/tools/vector_search.py` — thin facade over `VectorRepository`,
+  used by the `retrieve` node.
+- `services/tools/web_search.py` — DuckDuckGo by default (no key needed),
+  Tavily if `TAVILY_API_KEY` is set. Hits are wrapped as LangChain
+  `Document` objects with `origin: "web"` and merged into the graded pool so
+  the generator and the citation renderer treat them uniformly.
+
+A document's origin is displayed as a tag on every citation in the
+frontend's finding card, so the reviewer can immediately tell whether a
+claim is grounded in the indexed corpus or in a live web result.
+
+---
+
+## 7. Human-in-the-loop
+
+After the generator runs, a reviewer chain assesses faithfulness. If it
+returns `needs_human_review=True` (or if generation failed entirely), the
+graph reaches `human_in_the_loop`, which calls LangGraph's `interrupt(...)`.
+The HTTP stream surfaces this as an SSE `interrupt` event carrying the
+thread id and the payload. The frontend's `HitlBannerComponent` lets the
+operator pick:
+
+| Action | Effect |
+|---|---|
+| `approve` | Resume with the current draft as the final answer. |
+| `edit_answer` | Submit a corrected answer (immediately final). |
+| `revise_query` | Replace the question and re-enter the retrieval loop. |
+
+The resume call hits `/api/agent/resume/{thread_id}/stream`, which posts a
+`Command(resume=payload)` into the checkpointed graph — the same thread,
+same state, picked up exactly where it paused.
+
+---
+
+## 8. Prompt A/B Evaluation
+
+`POST /api/evaluate` accepts a list of questions and runs each question
+through both prompt variants `A` (narrative) and `B` (structured headings).
+An LLM-as-judge chain scores `answer_relevance`, `groundedness`, and an
+`overall` aggregate in `[0, 1]`. The Angular `EvaluationConsoleComponent`
+renders the side-by-side results with a winner badge.
+
+---
+
+## 9. Setup & Running the Stack
+
+### Prerequisites
+- Python 3.11+ and [uv](https://docs.astral.sh/uv/)
+- Node.js 20+ and npm
+
+### Backend
 
 ```bash
-# ── Required ──────────────────────────────────────────────────────────────
-OPENAI_API_KEY=sk-...your-key-here...
-
-# ── Optional (defaults shown) ─────────────────────────────────────────────
-OPENAI_MODEL=gpt-4o
-OPENAI_EMBED_MODEL=text-embedding-3-small
-CHROMA_PERSIST_DIR=./chroma_db
-CHROMA_COLLECTION=gcn_eeg_papers
-RETRIEVER_TOP_K=5
+cd backend
+cp .env.example .env
+#   Edit .env: set GEMINI_API_KEY or OPENAI_API_KEY or GROK_API_KEY
+uv sync
+uv run rag-ingest ./papers      # one-off: ingest a folder of PDFs
+uv run rag-api                  # http://localhost:8000 · /docs for Swagger
 ```
 
-Load the environment before execution:
+### Frontend
 
 ```bash
-# Using python-dotenv (auto-loaded if you add load_dotenv() to workflow.py)
-# Or explicitly:
-export $(cat .env | xargs)
+cd auto-corrector-rag-frontend
+npm install
+npm start                       # http://localhost:4200
+```
+
+The Angular dev server proxies `/api/*` to `http://localhost:8000`, so no
+CORS configuration is needed during development. CORS is also pre-enabled
+on the FastAPI side for `http://localhost:4200`.
+
+---
+
+## 10. Project File Structure
+
+```
+.
+├── backend/                                FastAPI service (uv project)
+│   ├── pyproject.toml
+│   ├── uv.lock
+│   ├── .env.example
+│   ├── README.md
+│   ├── ANGULAR_INTEGRATION.md
+│   └── src/rag_agent/
+│       ├── main.py
+│       ├── core/ {config, logging, llm_factory}.py
+│       ├── models/ {state, schemas, grading}.py
+│       ├── repositories/ {vector_repository, document_repository}.py
+│       ├── services/
+│       │   ├── tools/ {vector_search, web_search}.py
+│       │   ├── prompts.py · chains.py
+│       │   ├── nodes.py · workflow.py
+│       │   ├── agent_service.py
+│       │   ├── ingestion_service.py
+│       │   └── evaluation_service.py
+│       └── controllers/ {health, agent, ingestion, evaluation}_controller.py
+│
+├── auto-corrector-rag-frontend/            Angular 21 MVVM workspace
+│   ├── README.md
+│   ├── proxy.conf.json                     /api → :8000
+│   ├── src/styles.css                      Tailwind v4 @theme tokens
+│   └── src/app/
+│       ├── core/      models/ · services/ · state/
+│       ├── features/  workspace/ · library/ · system-health/
+│       └── shared/    layout/ (TopAppBar, SideNav, Footer, Shell)
+│
+├── CONTEXT.md                              Coding standards & ADR log
+└── README.md                               This file
 ```
 
 ---
 
-## 7. Usage
+## 11. API Surface
 
-### 7.1 Command-Line Interface
-
-```bash
-# Run with the default benchmark question
-python workflow.py
-
-# Run with a custom research question
-python workflow.py "What are the principal advantages of spectral-domain graph \
-convolution over spatial-domain methods for EEG-based emotion recognition?"
+```
+GET  /api/health                              provider, model, vector store, web tool
+POST /api/agent/run                           sync run, returns full final state
+GET  /api/agent/stream                        SSE — live agent trace
+POST /api/agent/resume/{thread_id}            resume after HITL (sync)
+GET  /api/agent/resume/{thread_id}/stream     resume after HITL (SSE)
+GET  /api/agent/state/{thread_id}             inspect a checkpointed session
+POST /api/ingest/pdfs                         ingest a server-side directory
+POST /api/ingest/upload                       multipart upload + ingest
+POST /api/evaluate                            A/B prompt evaluation
 ```
 
-**Expected CLI output:**
-```
-════════════════════════════════════════════════════════════════════════════
-  AUTO-CORRECTING RESEARCH AGENT
-  Query: What are the principal advantages of spectral-domain graph...
-════════════════════════════════════════════════════════════════════════════
-
-  ▶  [RETRIEVE]
-     Retrieved 5 document(s)  |  loop_step → 1
-
-  ▶  [GRADE_DOCUMENTS]
-     Relevant: 2/5  |  decision → transform_query
-
-  ▶  [TRANSFORM_QUERY]
-     New query: spectral graph convolution Chebyshev polynomial EEG...
-
-  ▶  [RETRIEVE]
-     Retrieved 5 document(s)  |  loop_step → 2
-
-  ▶  [GRADE_DOCUMENTS]
-     Relevant: 4/5  |  decision → generate
-
-  ▶  [GENERATE]
-     Generation: 1842 chars
-
-════════════════════════════════════════════════════════════════════════════
-  SYNTHESISED ANSWER
-
-  [Synthesised academic answer appears here, grounded in retrieved context]
-════════════════════════════════════════════════════════════════════════════
-```
-
-### 7.2 Programmatic API
-
-```python
-from workflow import run_research_query, graph
-from state import AgentState
-
-# Option 1: High-level helper (recommended)
-answer = run_research_query(
-    "How does the Chebyshev polynomial approximation reduce the computational "
-    "complexity of spectral graph convolution in EEG-based BCI systems?",
-    stream=True,
-)
-
-# Option 2: Direct graph invocation (for integration)
-initial_state = AgentState(
-    question="Your research question here",
-    original_question="Your research question here",
-    documents=[],
-    graded_documents=[],
-    generation=None,
-    loop_step=0,
-    relevance_decision=None,
-    error=None,
-)
-final_state = graph.invoke(initial_state)
-print(final_state["generation"])
-
-# Option 3: Streaming for real-time node tracing
-for step in graph.stream(initial_state):
-    for node_name, node_output in step.items():
-        print(f"[{node_name}]: loop_step={node_output.get('loop_step', 'N/A')}")
-```
-
-### 7.3 Jupyter Notebook Integration
-
-```python
-# In a Jupyter cell:
-import nest_asyncio
-nest_asyncio.apply()           # Required for async in Jupyter
-
-from workflow import graph, _build_initial_state
-from IPython.display import display, Markdown
-
-state = _build_initial_state(
-    "Discuss the role of adjacency matrix construction strategies "
-    "in GCN-based EEG motor imagery decoding."
-)
-
-final = graph.invoke(state)
-display(Markdown(final["generation"]))
-```
+Full schemas live in [`backend/src/rag_agent/models/schemas.py`](backend/src/rag_agent/models/schemas.py)
+and are auto-rendered at `http://localhost:8000/docs`.
 
 ---
 
-## 8. Project File Structure
+## 12. Safety & Observability
 
-```mermaid
-%%{init: {
-  "theme": "dark",
-  "themeVariables": {
-    "background": "#000000",
-    "primaryColor": "#e0b12d",
-    "primaryTextColor": "#111111",
-    "primaryBorderColor": "#e0b12d",
-    "secondaryColor": "#2b6cff",
-    "secondaryTextColor": "#d7e3ff",
-    "secondaryBorderColor": "#2b6cff",
-    "lineColor": "#2a2a2a",
-    "textColor": "#cfcfcf",
-    "fontFamily": "Inter, ui-sans-serif, system-ui, Arial"
-  },
-  "flowchart": { "curve": "basis" }
-}}%%
-
-flowchart TD
-  ROOT([Auto-Correcting Academic Research Agent]):::root
-  ROOT --> RA[research_agent/]:::folder
-
-  RA --> STATE["state.py\nAgentState TypedDict, GradedDocument, constants"]:::file
-  RA --> NODES["nodes.py\nNode functions, schemas, prompts"]:::file
-  RA --> WF["workflow.py\nGraph assembly, routing, CLI"]:::file
-
-  RA --> CONTEXT["CONTEXT.md\nPersistent session memory"]:::file
-  RA --> README["README.md\nProject documentation"]:::file
-
-  RA --> ENV[".env\nEnvironment variables (gitignored)"]:::file
-  RA --> ENVEX[".env.example\nEnvironment template"]:::file
-  RA --> REQ["requirements.txt\nPython dependencies"]:::file
-  RA --> GI[".gitignore\nIgnores .env, chroma_db/, __pycache__/, .venv/"]:::file
-
-  RA --> CHROMA["chroma_db/\nChromaDB persistence (gitignored)"]:::folder
-
-  RA --> ING["ingest.py\n[PLANNED] Corpus ingestion pipeline"]:::planned
-  RA --> EVAL[eval/]:::folder
-  EVAL --> EVALPY["evaluate.py\n[PLANNED] RAGAS evaluation"]:::planned
-  RA --> APP["app.py\n[PLANNED] Streamlit dashboard"]:::planned
-
-  classDef root fill:#e0b12d,stroke:#e0b12d,color:#111111,stroke-width:2px;
-  classDef folder fill:#1a3f8f,stroke:#2b6cff,color:#eaf1ff,stroke-width:2px;
-  classDef file fill:#0f1a2b,stroke:#2b6cff,color:#cfe0ff,stroke-width:1px;
-  classDef planned fill:#1b1b1b,stroke:#6b6b6b,color:#cfcfcf,stroke-dasharray: 6 4;
-```
+- **Hard loop cap** — `MAX_RETRIEVE_ITERATIONS = 3` (defaults via env).
+- **Defense-in-depth router** — the loop cap is enforced in *both* the
+  grader (writes the decision) and the conditional router (overrides).
+- **Web-search escalation** — replaces "loop until cap" with "search the
+  web at the cap", so dead-ends don't silently degrade answer quality.
+- **Reviewer chain** before the answer can leave the graph.
+- **Human-in-the-loop interrupt** for risky answers, with full state
+  preservation through LangGraph's checkpointer.
+- **Structured logs** at every node entry / decision point following
+  `NODE:<name> | key=value | …` (RULE O-2 in `CONTEXT.md`).
 
 ---
 
-## 9. Roadmap
+## 13. Roadmap
 
-```mermaid
-graph LR
-    subgraph "Phase 1 - Foundation (COMPLETE)"
-        P1A["✅ state.py\nAgentState + TypedDict"]
-        P1B["✅ nodes.py\n4 node functions"]
-        P1C["✅ workflow.py\nGraph assembly + CLI"]
-    end
-
-    subgraph "Phase 2 - Data (IN PROGRESS)"
-        P2A["⚡ ingest.py\nCorpus ingestion pipeline\nArxiv + PDF loaders\nChromaDB population"]
-    end
-
-    subgraph "Phase 3 - Quality Assurance"
-        P3A["🔲 tests/\nUnit + integration tests\npytest + mock LLM"]
-        P3B["🔲 eval/\nRAGAS evaluation\nFaithfulness + Precision"]
-    end
-
-    subgraph "Phase 4 - Interface"
-        P4A["🔲 app.py\nStreamlit dashboard\nReal-time node trace\nSource visualisation"]
-    end
-
-    P1A & P1B & P1C --> P2A --> P3A & P3B --> P4A
-```
-
-**Target corpus for ingestion (Phase 2):**
-
-| Paper | Authors | Year | Relevance |
-|---|---|---|---|
-| Convolutional Neural Networks on Graphs with Fast Localized Spectral Filtering | Defferrard et al. | 2016 | Foundational GCN / ChebNet |
-| Semi-Supervised Classification with Graph Convolutional Networks | Kipf & Welling | 2017 | GCN architecture baseline |
-| EEGNet: A Compact Convolutional Neural Network for EEG-Based BCIs | Lawhern et al. | 2018 | EEG deep learning baseline |
-| EEG Emotion Recognition Using Dynamical Graph Convolutional Neural Networks | Song et al. | 2020 | GCN + EEG affective computing |
-| Graph Neural Networks for Motor Imagery EEG Classification | Multiple | 2021–2024 | Direct application domain |
-
----
-
-## 10. References
-
-Defferrard, M., Bresson, X., & Vandergheynst, P. (2016). Convolutional neural networks on graphs with fast localized spectral filtering. *Advances in Neural Information Processing Systems*, 29.
-
-Es, S., James, J., Espinosa-Anke, L., & Schockaert, S. (2023). RAGAS: Automated evaluation of retrieval augmented generation. *arXiv preprint arXiv:2309.15217*.
-
-Kipf, T. N., & Welling, M. (2017). Semi-supervised classification with graph convolutional networks. *International Conference on Learning Representations (ICLR)*.
-
-Lawhern, V. J., Solon, A. J., Waytowich, N. R., Gordon, S. M., Hung, C. P., & Lance, B. J. (2018). EEGNet: A compact convolutional neural network for EEG-based brain-computer interfaces. *Journal of Neural Engineering*, 15(5).
-
-Lewis, P., Perez, E., Piktus, A., Petroni, F., Karpukhin, V., Goyal, N., ... & Kiela, D. (2020). Retrieval-augmented generation for knowledge-intensive NLP tasks. *Advances in Neural Information Processing Systems*, 33.
-
-Song, T., Zheng, W., Song, P., & Cui, Z. (2020). EEG emotion recognition using dynamical graph convolutional neural networks. *IEEE Transactions on Affective Computing*, 11(3), 532–541.
-
-Tang, X., et al. (2023). Self-reflective retrieval-augmented generation. *arXiv preprint*.
-
-Yao, S., Zhao, J., Yu, D., Du, N., Shafran, I., Narasimhan, K., & Cao, Y. (2023). ReAct: Synergizing reasoning and acting in language models. *International Conference on Learning Representations (ICLR)*.
-
----
-
-*This document was generated as part of the ENSET Master's project on Distributed Systems and Artificial Intelligence. All architectural decisions are recorded in `CONTEXT.md`.*
+- Persistent thread checkpointer (swap `MemorySaver` for SQLite / Redis).
+- Per-document chunking metadata in the corpus table.
+- Tavily web-search advanced filters (domain include/exclude) configurable from the UI.
+- Reranking node between `retrieve` and `grade_documents`.
+- Auth (Keycloak / OAuth) on the FastAPI surface.
+- Hosted deployment recipe (Docker Compose for backend + Nginx for the Angular bundle).
