@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import {
+  CorpusListResponse,
   IngestDirectoryRequest,
   IngestResponse,
 } from '../models/ingestion.model';
@@ -21,5 +22,9 @@ export class IngestionApiService {
     const form = new FormData();
     files.forEach((f) => form.append('files', f, f.name));
     return this.http.post<IngestResponse>(`${this.base}/upload`, form);
+  }
+
+  listCorpus(): Observable<CorpusListResponse> {
+    return this.http.get<CorpusListResponse>(`${this.base}/corpus`);
   }
 }

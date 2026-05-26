@@ -29,6 +29,7 @@ dependencies = [
     "langchain-google-genai>=2.0.0",
     "langchain-xai>=0.1.0",
     "langchain-huggingface>=0.1.0",
+    "langchain-ollama>=0.2.0",
 
     # Vector store + ingestion
     "chromadb>=0.5.0",
@@ -36,7 +37,7 @@ dependencies = [
     "pypdf>=4.3.0",
 
     # Web search tools
-    "duckduckgo-search>=6.2.0",
+    "ddgs>=9.0.0",
     "tavily-python>=0.5.0",
     "httpx>=0.27.0",
 

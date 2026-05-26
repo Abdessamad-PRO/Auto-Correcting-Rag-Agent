@@ -17,7 +17,8 @@ logger = get_logger(__name__)
 
 
 def _ddg_search(query: str, max_results: int) -> List[Document]:
-    from duckduckgo_search import DDGS
+    # The package was renamed `duckduckgo_search` → `ddgs` in 2025.
+    from ddgs import DDGS
 
     results: List[Document] = []
     with DDGS() as ddgs:

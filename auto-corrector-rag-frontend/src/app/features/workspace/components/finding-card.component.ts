@@ -2,11 +2,12 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 
 import { AgentSessionStore } from '../../../core/state/agent-session.store';
+import { MarkdownComponent } from '../../../shared/components/markdown.component';
 
 @Component({
   selector: 'app-finding-card',
   standalone: true,
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, MarkdownComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (session.hasAnswer()) {
@@ -28,9 +29,7 @@ import { AgentSessionStore } from '../../../core/state/agent-session.store';
           }
         </div>
 
-        <pre
-          class="font-body-lg text-body-lg text-on-surface leading-relaxed whitespace-pre-wrap"
-        >{{ session.answer() }}</pre>
+        <app-markdown [content]="session.answer()" />
 
         @if (session.citations().length > 0) {
           <div class="border-l-2 border-outline pl-4 mt-2 flex flex-col gap-2">

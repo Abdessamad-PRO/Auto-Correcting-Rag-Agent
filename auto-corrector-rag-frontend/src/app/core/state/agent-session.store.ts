@@ -82,6 +82,13 @@ export class AgentSessionStore {
     return t > 0 ? Math.round((this.relevantCount() / t) * 100) : 0;
   });
 
+  /** The node that produced the most recent trace event — used by the UI
+   *  to highlight "what the agent is doing right now". */
+  readonly currentNode = computed(() => {
+    const trace = this.trace();
+    return trace.length > 0 ? trace[trace.length - 1].node : null;
+  });
+
   /* ---------------------- Streaming subscription --------------------- */
   private streamSub?: Subscription;
 

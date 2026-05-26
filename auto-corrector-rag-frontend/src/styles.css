@@ -186,3 +186,153 @@ html, body {
 
 /* === Brutalist hard shadow accent ======================================== */
 .shadow-brutal { box-shadow: 4px 4px 0 #000; }
+
+/* ============================================================================
+ * Markdown body — rendered LLM output (`app-markdown` component)
+ * ========================================================================= */
+.markdown-body {
+  font-family: var(--font-body-md);
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--color-on-surface);
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+.markdown-body > *:first-child { margin-top: 0; }
+.markdown-body > *:last-child  { margin-bottom: 0; }
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  font-family: var(--font-headline-md);
+  color: var(--color-primary);
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 1.4em 0 0.6em;
+  letter-spacing: -0.01em;
+}
+.markdown-body h1 { font-size: 28px; border-bottom: 1px solid var(--color-outline-variant); padding-bottom: 6px; }
+.markdown-body h2 { font-size: 24px; border-bottom: 1px solid var(--color-outline-variant); padding-bottom: 4px; }
+.markdown-body h3 { font-size: 20px; color: var(--color-tertiary-container); }
+.markdown-body h4 { font-size: 17px; color: var(--color-tertiary-fixed-dim); }
+.markdown-body h5,
+.markdown-body h6 { font-size: 15px; color: var(--color-on-surface-variant); text-transform: uppercase; letter-spacing: 0.06em; }
+
+.markdown-body p {
+  margin: 0 0 1em;
+}
+
+.markdown-body strong { color: var(--color-primary); font-weight: 700; }
+.markdown-body em     { color: var(--color-secondary-fixed-dim); font-style: italic; }
+
+.markdown-body a {
+  color: var(--color-tertiary-container);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.markdown-body a:hover { color: var(--color-tertiary-fixed-dim); }
+
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid var(--color-outline-variant);
+  margin: 1.8em 0;
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin: 0 0 1em;
+  padding-left: 1.5em;
+}
+.markdown-body ul { list-style: square; }
+.markdown-body ol { list-style: decimal; }
+.markdown-body li { margin: 0.25em 0; }
+.markdown-body li::marker { color: var(--color-tertiary-fixed-dim); }
+.markdown-body ul ul,
+.markdown-body ol ol,
+.markdown-body ul ol,
+.markdown-body ol ul { margin: 0.25em 0; }
+
+.markdown-body blockquote {
+  margin: 1em 0;
+  padding: 6px 14px;
+  color: var(--color-on-surface-variant);
+  border-left: 3px solid var(--color-outline);
+  background: var(--color-surface-container-low);
+  font-style: italic;
+}
+
+.markdown-body code {
+  font-family: 'Consolas', 'Courier New', ui-monospace, monospace;
+  font-size: 0.9em;
+  background: var(--color-surface-container-low);
+  border: 1px solid var(--color-outline-variant);
+  padding: 1px 6px;
+  color: var(--color-tertiary-fixed-dim);
+}
+
+.markdown-body pre {
+  margin: 1em 0;
+  padding: 12px 14px;
+  background: var(--color-surface-container-lowest);
+  border: 1px solid var(--color-outline-variant);
+  overflow-x: auto;
+  line-height: 1.5;
+}
+.markdown-body pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--color-on-surface);
+  font-size: 13px;
+}
+
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 14px;
+}
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--color-outline-variant);
+  padding: 6px 10px;
+  text-align: left;
+}
+.markdown-body th {
+  background: var(--color-surface-container-low);
+  font-family: var(--font-label-caps);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-on-surface-variant);
+}
+.markdown-body tr:nth-child(even) td { background: var(--color-surface-container-low); }
+
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Inline math is preserved as plain text — Caesar-cipher-style $...$ shows up
+ * but a full KaTeX integration is intentionally deferred. */
+.markdown-body :is(p, li) code:has(+ code) { margin-right: 2px; }
+
+/* ============================================================================
+ * Mobile drawer for the side-nav (toggle controlled by .nav-open on <body>)
+ * ========================================================================= */
+@media (max-width: 767px) {
+  body.nav-open .mobile-backdrop {
+    display: block;
+  }
+  .mobile-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 25;
+  }
+}

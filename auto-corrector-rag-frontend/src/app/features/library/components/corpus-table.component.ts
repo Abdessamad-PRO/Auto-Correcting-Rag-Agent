@@ -12,11 +12,26 @@ import { LibraryStore } from '../../../core/state/library.store';
     <section class="bg-surface p-0 flex-1 flex flex-col">
       <div
         class="p-gutter border-b border-outline-variant flex justify-between items-center
-               bg-surface-container-low"
+               bg-surface-container-low flex-wrap gap-2"
       >
-        <h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">
-          Indexed Corpus
-        </h3>
+        <div class="flex items-center gap-2">
+          <h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">
+            Indexed Corpus
+          </h3>
+          @if (library.collectionName(); as col) {
+            <span
+              class="px-2 py-0.5 bg-surface-variant border border-outline-variant
+                     font-technical-data text-[10px] text-on-surface uppercase"
+              [title]="'ChromaDB collection: ' + col"
+            >{{ col }}</span>
+          }
+          @if (library.loadingCorpus()) {
+            <span class="flex items-center gap-1 font-technical-data text-technical-data text-tertiary-fixed-dim">
+              <span class="w-2 h-2 rounded-full bg-tertiary-fixed-dim animate-pulse"></span>
+              loading…
+            </span>
+          }
+        </div>
         <div class="flex gap-2 items-center">
           <input
             type="text"
@@ -29,7 +44,14 @@ import { LibraryStore } from '../../../core/state/library.store';
           <span
             class="font-technical-data text-technical-data text-on-surface-variant
                    bg-surface px-2 py-1 border border-outline-variant"
-          >Total: {{ library.corpus().length }}</span>
+            [title]="library.totalChunks() + ' chunks total'"
+          >Docs: {{ library.corpus().length }} · Chunks: {{ library.totalChunks() }}</span>
+          <button
+            type="button"
+            class="material-symbols-outlined text-on-surface-variant hover:text-primary p-1"
+            title="Refresh"
+            (click)="library.loadCorpus()"
+          >refresh</button>
         </div>
       </div>
 

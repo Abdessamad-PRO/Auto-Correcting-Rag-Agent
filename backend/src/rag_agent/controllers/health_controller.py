@@ -18,7 +18,8 @@ def health() -> HealthResponse:
         "gemini": settings.gemini_model,
         "openai": settings.openai_model,
         "grok": settings.grok_model,
-    }[provider]
+        "ollama": settings.ollama_model,
+    }.get(provider, "unknown")
     return HealthResponse(
         status="ok",
         provider=provider,
