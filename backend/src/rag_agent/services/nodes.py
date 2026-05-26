@@ -6,16 +6,25 @@ update; LangGraph's reducer merges the partials into the next state.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List
 
 from langchain_core.documents import Document
 from langgraph.types import interrupt
 
+# Reasoning models (e.g. deepseek-r1) wrap their internal chain-of-thought
+# in <think>...</think> tags. Strip them server-side so the UI never has to
+# show the raw scratchpad.
+_THINK_BLOCK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+
+
+def _strip_think(text: str) -> str:
+    return _THINK_BLOCK_RE.sub("", text).strip()
+
 from ..core.config import get_settings
 from ..core.logging import get_logger
 from ..models.grading import (
     AnswerReview,
-    RelevanceGrade,
     ResearchPlan,
     TransformedQuery,
 )
@@ -36,7 +45,7 @@ def plan_research(state: AgentState) -> Dict[str, Any]:
     logger.info("NODE:plan_research | question='%s'", state["question"])
     try:
         result: ResearchPlan = chains.planner_chain().invoke({"question": state["question"]})
-        return {"plan": result.plan, "error": None}
+        return {"plan": _strip_think(result.plan or ""), "error": None}
     except Exception as exc:  # noqa: BLE001
         logger.error("NODE:plan_research | exception: %s", exc, exc_info=True)
         return {"plan": None, "error": f"Planning failure: {exc}"}
@@ -79,18 +88,27 @@ def grade_documents(state: AgentState) -> Dict[str, Any]:
     loop_step = state.get("loop_step", 0)
     logger.info("NODE:grade_documents | grading %d doc(s) | loop_step=%d", len(docs), loop_step)
 
+    # Parallel grading — Runnable.batch fan-outs invocations across a
+    # threadpool, so on a slow CPU-bound local LLM we spend ~one model-call
+    # of wall-time instead of N. `return_exceptions=True` keeps the rest of
+    # the batch even when one document trips the model.
+    inputs = [
+        {"question": state["question"], "document": d.page_content} for d in docs
+    ]
+    grades = chains.grader_chain().batch(
+        inputs,
+        return_exceptions=True,
+        config={"max_concurrency": min(8, max(2, len(inputs)))},
+    )
     graded: List[GradedDocument] = []
-    for doc in docs:
-        try:
-            grade: RelevanceGrade = chains.grader_chain().invoke(
-                {"question": state["question"], "document": doc.page_content}
-            )
-            relevance = "relevant" if grade.binary_score.lower() == "yes" else "irrelevant"
-            score = grade.confidence if relevance == "relevant" else 1.0 - grade.confidence
-            graded.append(GradedDocument(document=doc, relevance=relevance, score=score))
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("  grading failed for one document: %s", exc)
+    for doc, grade in zip(docs, grades):
+        if isinstance(grade, Exception):
+            logger.warning("  grading failed for one document: %s", grade)
             graded.append(GradedDocument(document=doc, relevance="irrelevant", score=0.0))
+            continue
+        relevance = "relevant" if grade.binary_score.lower() == "yes" else "irrelevant"
+        score = grade.confidence if relevance == "relevant" else 1.0 - grade.confidence
+        graded.append(GradedDocument(document=doc, relevance=relevance, score=score))
 
     n_rel = sum(1 for g in graded if g["relevance"] == "relevant")
     fraction = (n_rel / len(graded)) if graded else 0.0
@@ -201,6 +219,7 @@ def generate(state: AgentState) -> Dict[str, Any]:
 
     try:
         answer = chain.invoke({"question": state["question"], "context": context_str})
+        answer = _strip_think(answer)
         logger.info("NODE:generate | %d chars generated", len(answer))
         return {"generation": answer, "error": None}
     except Exception as exc:  # noqa: BLE001

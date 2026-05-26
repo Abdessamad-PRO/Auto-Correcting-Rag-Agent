@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject } from '@angular/core';
 
+import { LibraryStore } from '../../core/state/library.store';
 import { CorpusTableComponent } from './components/corpus-table.component';
 import { EvaluationConsoleComponent } from './components/evaluation-console.component';
 import { PipelineTasksComponent } from './components/pipeline-tasks.component';
@@ -15,6 +16,7 @@ import { UploadZoneComponent } from './components/upload-zone.component';
     UploadZoneComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: [`:host { display: contents; }`],
   template: `
     <main class="flex-1 overflow-y-auto cyber-scroll p-gutter relative">
       <div class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-px bg-outline-variant">
@@ -33,4 +35,10 @@ import { UploadZoneComponent } from './components/upload-zone.component';
     </main>
   `,
 })
-export class LibraryPage {}
+export class LibraryPage implements OnInit {
+  private readonly library = inject(LibraryStore);
+
+  ngOnInit(): void {
+    this.library.loadCorpus();
+  }
+}

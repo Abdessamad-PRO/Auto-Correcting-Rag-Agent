@@ -9,10 +9,10 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import List, Literal, Optional
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-ProviderName = Literal["gemini", "openai", "grok"]
+ProviderName = Literal["gemini", "openai", "grok", "ollama"]
 
 
 class Settings(BaseSettings):
@@ -27,6 +27,10 @@ class Settings(BaseSettings):
 
     # --- Provider override (optional) -------------------------------------
     llm_provider: Optional[ProviderName] = None
+    #: When true, force Ollama as the primary provider regardless of which
+    #: remote API keys are present. Remote providers (if their keys are set)
+    #: still appear later in the fallback chain.
+    local: bool = False
 
     # --- Provider credentials --------------------------------------------
     gemini_api_key: Optional[str] = None
@@ -34,14 +38,31 @@ class Settings(BaseSettings):
     grok_api_key: Optional[str] = None
 
     # --- Models -----------------------------------------------------------
-    gemini_model: str = "gemini-1.5-pro"
-    gemini_embed_model: str = "models/text-embedding-004"
+    gemini_model: str = "gemini-flash-latest"
+    gemini_embed_model: str = "models/gemini-embedding-001"
+    #: Same-provider fallback used when ``gemini_model`` is rate-limited or fails.
+    gemini_fallback_model: str = "gemini-pro-latest"
 
     openai_model: str = "gpt-4o"
     openai_embed_model: str = "text-embedding-3-small"
 
-    grok_model: str = "grok-2-latest"
+    grok_model: str = "grok-4-fast-reasoning"
     local_embed_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+
+    # --- Ollama (local fallback / local-first) --------------------------
+    #: URL of the local Ollama daemon (default Windows install: 11434).
+    ollama_base_url: str = "http://localhost:11434"
+    #: Primary Ollama model — used when ``local=True`` or when the resolver
+    #: falls back to ollama for any other reason.
+    ollama_model: str = "deepseek-r1:1.5b"
+    #: Comma-separated list of ``ollama list``-pulled model tags, tried as
+    #: extra fallbacks AFTER the primary chat model has failed.
+    ollama_fallback_models_raw: str = "gemma:2b"
+    #: Ollama model used for embeddings. Empty → reuse ``ollama_model``.
+    #: For best retrieval quality pull a dedicated embedding model:
+    #:     ollama pull nomic-embed-text
+    #: …then set OLLAMA_EMBED_MODEL=nomic-embed-text in .env.
+    ollama_embed_model: str = ""
 
     llm_temperature: float = 0.0
 
@@ -62,17 +83,28 @@ class Settings(BaseSettings):
     # --- API server -------------------------------------------------------
     api_host: str = "0.0.0.0"
     api_port: int = 8000
-    cors_origins: List[str] = Field(
-        default_factory=lambda: ["http://localhost:4200", "http://127.0.0.1:4200"]
+    #: Comma-separated string in the env; use ``cors_origins`` for the parsed list.
+    #: Kept as a plain ``str`` so pydantic-settings does not attempt to JSON-decode it.
+    cors_origins_raw: str = Field(
+        default="http://localhost:4200,http://127.0.0.1:4200",
+        validation_alias=AliasChoices("CORS_ORIGINS", "CORS_ORIGINS_RAW"),
     )
     log_level: str = "INFO"
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def _split_cors(cls, value):
-        if isinstance(value, str):
-            return [o.strip() for o in value.split(",") if o.strip()]
-        return value
+    @property
+    def cors_origins(self) -> List[str]:
+        return [o.strip() for o in self.cors_origins_raw.split(",") if o.strip()]
+
+    @property
+    def ollama_fallback_models(self) -> List[str]:
+        return [m.strip() for m in self.ollama_fallback_models_raw.split(",") if m.strip()]
+
+    @property
+    def effective_ollama_embed_model(self) -> str:
+        """Embed model used by Ollama. Falls back to the chat model when the
+        dedicated embed model env var is empty so a fresh setup works without
+        needing an extra ``ollama pull``."""
+        return self.ollama_embed_model.strip() or self.ollama_model
 
     # ---------------------------------------------------------------------
     # Derived
@@ -81,11 +113,17 @@ class Settings(BaseSettings):
         """Return the active LLM provider.
 
         Priority:
-            1. Explicit ``LLM_PROVIDER`` env var (if its key is present).
-            2. First provider with a non-empty API key in the order
-               Gemini → OpenAI → Grok.
+            1. ``LOCAL=true``                      → ollama (no key required).
+            2. Explicit ``LLM_PROVIDER`` env var   → that provider.
+            3. First provider with a non-empty API key in the order
+               Gemini → OpenAI → Grok → ollama (last resort).
         """
+        if self.local:
+            return "ollama"
+
         if self.llm_provider:
+            if self.llm_provider == "ollama":
+                return "ollama"
             key = self._provider_key(self.llm_provider)
             if not key:
                 raise RuntimeError(
@@ -100,16 +138,15 @@ class Settings(BaseSettings):
         if self.grok_api_key:
             return "grok"
 
-        raise RuntimeError(
-            "No LLM provider configured. Set one of GEMINI_API_KEY, OPENAI_API_KEY, "
-            "or GROK_API_KEY in the .env file."
-        )
+        # No remote keys configured — assume the user wants pure local mode.
+        return "ollama"
 
     def _provider_key(self, provider: ProviderName) -> Optional[str]:
         return {
             "gemini": self.gemini_api_key,
             "openai": self.openai_api_key,
             "grok": self.grok_api_key,
+            "ollama": "local",  # placeholder, no key required
         }[provider]
 
 

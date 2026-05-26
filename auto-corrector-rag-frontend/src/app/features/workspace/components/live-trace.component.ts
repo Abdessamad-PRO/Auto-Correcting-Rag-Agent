@@ -26,7 +26,7 @@ const NODE_STYLE: Record<TraceNodeName, TraceStyle> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <aside
-      class="w-80 flex-shrink-0 bg-surface border-l border-outline-variant flex flex-col
+      class="w-80 shrink-0 bg-surface border-l border-outline-variant flex-col
              overflow-hidden hidden lg:flex relative z-10 scanline"
     >
       <div
@@ -50,7 +50,7 @@ const NODE_STYLE: Record<TraceNodeName, TraceStyle> = {
       </div>
 
       <div
-        class="flex-1 overflow-y-auto cyber-scroll p-panel-padding font-technical-data
+        class="flex-1 min-h-0 overflow-y-auto cyber-scroll p-panel-padding font-technical-data
                text-technical-data flex flex-col gap-3"
       >
         @if (session.trace().length === 0 && !session.isStreaming()) {

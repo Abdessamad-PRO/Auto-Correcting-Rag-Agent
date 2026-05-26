@@ -6,6 +6,7 @@ import { SystemStatusStore } from '../../core/state/system-status.store';
   selector: 'app-system-health-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: [`:host { display: contents; }`],
   template: `
     <main class="flex-1 overflow-y-auto cyber-scroll p-margin-edge">
       <div class="max-w-4xl mx-auto flex flex-col gap-stack-loose">

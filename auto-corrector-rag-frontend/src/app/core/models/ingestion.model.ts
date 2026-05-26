@@ -27,3 +27,19 @@ export interface CorpusDocument {
   status: 'ready' | 'processing' | 'error';
   type: 'pdf' | 'md' | 'txt' | 'other';
 }
+
+/** Backend DTO from ``GET /api/ingest/corpus``. */
+export interface CorpusEntry {
+  id: string;
+  title: string;
+  source: string;
+  year?: number | string | null;
+  chunks: number;
+}
+
+export interface CorpusListResponse {
+  collection: string;
+  total_docs: number;
+  total_chunks: number;
+  documents: CorpusEntry[];
+}

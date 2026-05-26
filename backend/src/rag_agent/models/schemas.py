@@ -71,6 +71,21 @@ class IngestResponse(BaseModel):
     persist_dir: str
 
 
+class CorpusEntry(BaseModel):
+    id: str
+    title: str
+    source: str
+    year: Optional[Any] = None
+    chunks: int
+
+
+class CorpusListResponse(BaseModel):
+    collection: str
+    total_docs: int
+    total_chunks: int
+    documents: List[CorpusEntry]
+
+
 # ---------------------------------------------------------------------------
 # Evaluation
 # ---------------------------------------------------------------------------

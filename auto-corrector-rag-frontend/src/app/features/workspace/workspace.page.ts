@@ -1,10 +1,22 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
 import { AgentSessionStore } from '../../core/state/agent-session.store';
+import { MarkdownComponent } from '../../shared/components/markdown.component';
 import { FindingCardComponent } from './components/finding-card.component';
 import { HitlBannerComponent } from './components/hitl-banner.component';
 import { LiveTraceComponent } from './components/live-trace.component';
 import { QueryInputComponent } from './components/query-input.component';
+
+const NODE_LABEL: Record<string, string> = {
+  plan_research: 'Planning',
+  retrieve: 'Retrieving',
+  grade_documents: 'Grading',
+  transform_query: 'Rewriting query',
+  web_search: 'Searching the web',
+  generate: 'Synthesising',
+  review_answer: 'Reviewing',
+  human_in_the_loop: 'Awaiting human',
+};
 
 /**
  * Research Workspace — the View of the workspace ViewModel
@@ -18,16 +30,21 @@ import { QueryInputComponent } from './components/query-input.component';
     FindingCardComponent,
     HitlBannerComponent,
     LiveTraceComponent,
+    MarkdownComponent,
     QueryInputComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="flex-1 flex overflow-hidden">
+    <div class="flex-1 flex overflow-hidden min-h-0">
       <!-- Centre pane -->
-      <section class="flex-1 flex flex-col bg-surface-container-lowest overflow-hidden relative">
+      <section
+        class="flex-1 flex flex-col bg-surface-container-lowest overflow-hidden relative min-w-0 min-h-0"
+      >
         <app-hitl-banner />
 
-        <div class="flex-1 overflow-y-auto cyber-scroll p-margin-edge flex flex-col gap-6">
+        <div
+          class="flex-1 min-h-0 overflow-y-auto cyber-scroll p-margin-edge flex flex-col gap-6"
+        >
           @if (!session.question()) {
             <!-- Empty state -->
             <div class="flex flex-col items-center justify-center gap-6 mt-16 max-w-3xl mx-auto text-center">
@@ -46,7 +63,7 @@ import { QueryInputComponent } from './components/query-input.component';
           } @else {
             <!-- Query header -->
             <div class="flex flex-col gap-2 max-w-3xl">
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-3 flex-wrap">
                 <span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">
                   Query Initiated
                 </span>
@@ -59,15 +76,17 @@ import { QueryInputComponent } from './components/query-input.component';
                   Variant {{ session.promptVariant() }}
                 </span>
               </div>
-              <h2 class="font-headline-md text-headline-md text-primary leading-tight">
+              <h2 class="font-headline-md text-headline-md text-primary leading-tight wrap-break-word">
                 {{ session.question() }}
               </h2>
               @if (session.plan(); as plan) {
-                <details class="mt-2 border border-outline-variant bg-surface p-3">
+                <details class="mt-2 border border-outline-variant bg-surface p-3" open>
                   <summary class="font-label-caps text-label-caps text-on-surface-variant uppercase cursor-pointer">
                     Research Plan
                   </summary>
-                  <pre class="mt-2 font-technical-data text-technical-data text-on-surface whitespace-pre-wrap">{{ plan }}</pre>
+                  <div class="mt-3">
+                    <app-markdown [content]="plan" />
+                  </div>
                 </details>
               }
             </div>
@@ -101,6 +120,12 @@ import { QueryInputComponent } from './components/query-input.component';
                   </span>
                 </div>
               }
+              @if (session.isStreaming() && currentLabel(); as label) {
+                <div class="kpi current">
+                  <span class="dot"></span>
+                  <span class="font-label-caps text-label-caps uppercase">{{ label }}</span>
+                </div>
+              }
             </div>
 
             <!-- Finding card -->
@@ -118,7 +143,7 @@ import { QueryInputComponent } from './components/query-input.component';
 
             <!-- Error -->
             @if (session.error(); as err) {
-              <div class="max-w-3xl border border-error bg-error-container/20 p-3 text-error font-technical-data text-technical-data">
+              <div class="max-w-3xl border border-error bg-error-container/20 p-3 text-error font-technical-data text-technical-data wrap-break-word">
                 <span class="font-label-caps text-label-caps uppercase mr-2">Error</span>{{ err }}
               </div>
             }
@@ -133,6 +158,16 @@ import { QueryInputComponent } from './components/query-input.component';
     </div>
   `,
   styles: [`
+    /* Routed component host: make the page transparent to layout so its
+     * inner flex container becomes a direct child of the layout section.
+     * Without this, the host defaults to inline, the inner flex-1 has
+     * no constrained height, and the synthesis output renders at full
+     * content size with no inner scroll.
+     */
+    :host {
+      display: contents;
+    }
+
     .kpi {
       display: inline-flex;
       align-items: center;
@@ -141,8 +176,28 @@ import { QueryInputComponent } from './components/query-input.component';
       border: 1px solid var(--color-outline-variant);
       background: var(--color-surface);
     }
+    .kpi.current {
+      border-color: var(--color-tertiary-container);
+      color: var(--color-tertiary-container);
+    }
+    .kpi.current .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+      background: var(--color-tertiary-container);
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.4; transform: scale(0.85); }
+      50%      { opacity: 1;   transform: scale(1.1); }
+    }
   `],
 })
 export class WorkspacePage {
   protected readonly session = inject(AgentSessionStore);
+
+  protected currentLabel(): string | null {
+    const node = this.session.currentNode();
+    return node ? NODE_LABEL[node] ?? node : null;
+  }
 }

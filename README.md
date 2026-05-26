@@ -4,7 +4,7 @@
 > **Institution:** École Normale Supérieure de l'Enseignement Technique (ENSET)
 > **Programme:** Master's Degree — Distributed Systems and Artificial Intelligence
 > **Domain:** Graph Convolutional Networks (GCN) · Electroencephalography (EEG) · Brain-Computer Interfaces (BCI)
-> **Stack:** LangGraph · LangChain · ChromaDB · FastAPI · uv · Angular 21 · Tailwind v4
+> **Stack:** LangGraph · LangChain · ChromaDB · FastAPI · uv · Angular 21 · Tailwind v4 · Ollama
 
 ---
 
@@ -30,7 +30,8 @@ This report presents the **Auto-Correcting Academic Research Agent**, a closed-l
 10. [Project File Structure](#10-project-file-structure)
 11. [API Surface](#11-api-surface)
 12. [Safety & Observability](#12-safety--observability)
-13. [Roadmap](#13-roadmap)
+13. [Developer Experience](#13-developer-experience)
+14. [Roadmap](#14-roadmap)
 
 ---
 
@@ -49,7 +50,7 @@ The system is composed of three independently deployable layers:
 ┌──────────────────────────────▼──────────────────────────────────────┐
 │  FastAPI Backend (backend/)                                         │
 │  controllers → services → repositories → models   (layered)         │
-│  • Multi-provider LLM factory (Gemini / OpenAI / Grok)              │
+│  • Multi-provider LLM factory (Gemini / OpenAI / Grok / Ollama)     │
 │  • LangGraph workflow with checkpointed sessions                    │
 │  • Web search tool (DuckDuckGo / Tavily)                            │
 │  • PDF ingestion pipeline                                           │
@@ -176,18 +177,22 @@ Set **one** of these in `backend/.env`:
 GEMINI_API_KEY=...        # → Gemini 1.5 Pro    + Gemini embeddings
 OPENAI_API_KEY=...        # → GPT-4o            + text-embedding-3-small
 GROK_API_KEY=...          # → Grok 2            + local HF embeddings
+OLLAMA_MODEL=deepseek-r1  # → Local execution   + local/nomic embeddings
 ```
 
 The factory in [`backend/src/rag_agent/core/llm_factory.py`](backend/src/rag_agent/core/llm_factory.py)
 resolves the provider deterministically:
 
 1. Explicit `LLM_PROVIDER=<name>` override (must match a present key).
-2. Otherwise the first non-empty key in the order **Gemini → OpenAI → Grok**.
+2. Otherwise the first non-empty key in the order **Gemini → OpenAI → Grok → Ollama**.
 
-Embeddings track the provider, with one important fallback: Grok exposes no
-embedding API, so it transparently falls back to a local
-`sentence-transformers/all-MiniLM-L6-v2` model so ingestion and retrieval
-keep working.
+### 5.1 Local execution (Ollama)
+
+The system supports **DeepSeek-R1** and other local models via Ollama. Set `LOCAL=True` in `.env` to prioritise the `OLLAMA_BASE_URL` (default: `http://localhost:11434`) even if remote API keys are present.
+
+### 5.2 Embedding fallbacks
+
+Embeddings track the provider, with one important fallback: Grok and basic Ollama setups might not expose an embedding API. In these cases, the system transparently falls back to a local `sentence-transformers/all-MiniLM-L6-v2` model (or a specific `OLLAMA_EMBED_MODEL` like `nomic-embed-text` if configured).
 
 ---
 
@@ -239,13 +244,20 @@ renders the side-by-side results with a winner badge.
 
 ---
 
-## 9. Setup & Running the Stack
+### 9.1 Configuration (.env)
 
-### Prerequisites
-- Python 3.11+ and [uv](https://docs.astral.sh/uv/)
-- Node.js 20+ and npm
+| Variable | Default | Description |
+|---|---|---|
+| `LLM_PROVIDER` | `None` | Force a provider: `gemini`, `openai`, `grok`, or `ollama`. |
+| `LOCAL` | `false` | If `true`, prioritises Ollama for all LLM operations. |
+| `WEB_SEARCH_PROVIDER` | `duckduckgo` | Either `duckduckgo` (free) or `tavily` (requires key). |
+| `MAX_RETRIEVE_ITERATIONS`| `3` | Max attempts to refine retrieval before escalating to web. |
+| `RELEVANCE_THRESHOLD` | `0.5` | Minimum ratio of relevant documents to skip query transformation. |
+| `CHROMA_PERSIST_DIR` | `./chroma_db` | Folder for vector database storage. |
 
-### Backend
+### 9.2 Launching the Stack
+
+#### Backend
 
 ```bash
 cd backend
@@ -262,6 +274,15 @@ uv run rag-api                  # http://localhost:8000 · /docs for Swagger
 cd auto-corrector-rag-frontend
 npm install
 npm start                       # http://localhost:4200
+```
+
+### One-shot launcher (Windows)
+
+```bat
+run.bat install      :: first time only — uv sync + npm install
+run.bat              :: opens backend + frontend in two console windows
+run.bat backend      :: backend only (same window)
+run.bat frontend     :: frontend only (same window)
 ```
 
 The Angular dev server proxies `/api/*` to `http://localhost:8000`, so no
@@ -343,7 +364,18 @@ and are auto-rendered at `http://localhost:8000/docs`.
 
 ---
 
-## 13. Roadmap
+## 13. Developer Experience
+
+For deep dives into the implementation details and coding standards, refer to:
+
+- **[`CONTEXT.md`](CONTEXT.md)**: The "Project Brain" containing strict coding rules for the LangGraph agent, state schema, and routing logic.
+- **[`backend/ANGULAR_INTEGRATION.md`](backend/ANGULAR_INTEGRATION.md)**: Technical guide for SSE event mapping, DTO alignment, and recommended Angular service patterns.
+- **[`backend/README.md`](backend/README.md)**: Detailed backend architecture and API surface breakdown.
+- **[`auto-corrector-rag-frontend/README.md`](auto-corrector-rag-frontend/README.md)**: In-depth look at the Angular MVVM structure and cyber-brutalist Tailwind theme.
+
+---
+
+## 14. Roadmap
 
 - Persistent thread checkpointer (swap `MemorySaver` for SQLite / Redis).
 - Per-document chunking metadata in the corpus table.
