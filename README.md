@@ -16,22 +16,30 @@ This report presents the **Auto-Correcting Academic Research Agent**, a closed-l
 
 ---
 
+## Demo
+
+[![Watch the demo](https://img.youtube.com/vi/YOUR_VIDEO_ID/0.jpg)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
+*Click the image above to watch the system in action, demonstrating the self-correcting retrieval loop and live agent traces.*
+
+---
+
 ## Table of Contents
 
-1. [System Architecture](#1-system-architecture)
-2. [Agent Workflow (LangGraph)](#2-agent-workflow-langgraph)
-3. [Backend (FastAPI + uv)](#3-backend-fastapi--uv)
-4. [Frontend (Angular MVVM)](#4-frontend-angular-mvvm)
-5. [Multi-provider LLM](#5-multi-provider-llm)
-6. [Tools — Vector + Web Search](#6-tools--vector--web-search)
-7. [Human-in-the-loop](#7-human-in-the-loop)
-8. [Prompt A/B Evaluation](#8-prompt-ab-evaluation)
-9. [Setup & Running the Stack](#9-setup--running-the-stack)
-10. [Project File Structure](#10-project-file-structure)
-11. [API Surface](#11-api-surface)
-12. [Safety & Observability](#12-safety--observability)
-13. [Developer Experience](#13-developer-experience)
-14. [Roadmap](#14-roadmap)
+1. [Demo](#demo)
+2. [System Architecture](#1-system-architecture)
+3. [Agent Workflow (LangGraph)](#2-agent-workflow-langgraph)
+4. [Backend (FastAPI + uv)](#3-backend-fastapi--uv)
+5. [Frontend (Angular MVVM)](#4-frontend-angular-mvvm)
+6. [Multi-provider LLM](#5-multi-provider-llm)
+7. [Tools — Vector + Web Search](#6-tools--vector--web-search)
+8. [Human-in-the-loop](#7-human-in-the-loop)
+9. [Prompt A/B Evaluation](#8-prompt-ab-evaluation)
+10. [Setup & Running the Stack](#9-setup--running-the-stack)
+11. [Project File Structure](#10-project-file-structure)
+12. [API Surface](#11-api-surface)
+13. [Safety & Observability](#12-safety--observability)
+14. [Developer Experience](#13-developer-experience)
+15. [Roadmap](#14-roadmap)
 
 ---
 

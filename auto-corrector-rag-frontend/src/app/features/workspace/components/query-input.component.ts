@@ -9,6 +9,7 @@ import { PromptVariant } from '../../../core/models/agent.model';
   standalone: true,
   imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'contents' },
   template: `
     <div class="p-panel-padding bg-surface-container-low border-t border-outline-variant">
       <div class="max-w-4xl mx-auto flex flex-col gap-2">
