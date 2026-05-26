@@ -18,8 +18,13 @@ This report presents the **Auto-Correcting Academic Research Agent**, a closed-l
 
 ## Demo
 
-[![Watch the demo](https://img.youtube.com/vi/YOUR_VIDEO_ID/0.jpg)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
-*Click the image above to watch the system in action, demonstrating the self-correcting retrieval loop and live agent traces.*
+
+
+
+
+https://github.com/user-attachments/assets/4b93eadc-afd0-484d-948f-70210b9408da
+
+
 
 ---
 
