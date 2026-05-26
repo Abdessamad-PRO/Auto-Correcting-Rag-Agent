@@ -6,6 +6,7 @@ import { SystemStatusStore } from '../../core/state/system-status.store';
   selector: 'app-status-footer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'contents' },
   template: `
     <footer
       class="bg-surface-container-lowest text-tertiary fixed bottom-0 w-full h-8

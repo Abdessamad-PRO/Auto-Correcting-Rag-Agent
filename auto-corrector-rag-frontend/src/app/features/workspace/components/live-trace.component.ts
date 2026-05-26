@@ -24,6 +24,7 @@ const NODE_STYLE: Record<TraceNodeName, TraceStyle> = {
   selector: 'app-live-trace',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: [`:host { display: contents; }`],
   template: `
     <aside
       class="w-80 shrink-0 bg-surface border-l border-outline-variant flex-col

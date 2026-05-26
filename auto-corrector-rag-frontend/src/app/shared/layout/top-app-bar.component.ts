@@ -12,6 +12,7 @@ import { SystemStatusStore } from '../../core/state/system-status.store';
   selector: 'app-top-app-bar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'contents' },
   template: `
     <header
       class="bg-surface text-primary h-16 border-b border-outline-variant

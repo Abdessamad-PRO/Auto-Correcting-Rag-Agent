@@ -9,6 +9,7 @@ import { HumanAction } from '../../../core/models/agent.model';
   standalone: true,
   imports: [FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'contents' },
   template: `
     @if (session.isPaused() && session.interrupt(); as intr) {
       <div
