@@ -70,9 +70,9 @@ exit /b 0
 :check_env
 if not exist "%BACKEND%\.env" (
     echo.
-    echo [ERROR] backend\.env is missing. Copy backend\.env.example to backend\.env
-    echo         and set GEMINI_API_KEY / OPENAI_API_KEY / GROK_API_KEY first.
+    echo [WARN] backend\.env is missing. The backend will start with defaults.
+    echo        To use Gemini/OpenAI/Grok, copy backend\.env.example to backend\.env
+    echo        and set GEMINI_API_KEY / OPENAI_API_KEY / GROK_API_KEY or set LOCAL=true for Ollama.
     echo.
-    exit /b 1
 )
 exit /b 0
