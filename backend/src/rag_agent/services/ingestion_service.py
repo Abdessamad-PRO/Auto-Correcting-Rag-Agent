@@ -72,6 +72,6 @@ def cli() -> None:
         raise SystemExit("Usage: rag-ingest <pdf_dir>")
     result = get_ingestion_service().ingest_directory(sys.argv[1])
     print(
-        f"Ingested {result.files_ingested} file(s) → {result.chunks_added} chunks "
+        f"Ingested {result.files_ingested} file(s) -> {result.chunks_added} chunks "
         f"into '{result.collection}' at '{result.persist_dir}'."
     )

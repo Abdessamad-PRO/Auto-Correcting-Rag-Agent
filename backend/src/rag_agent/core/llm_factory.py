@@ -257,7 +257,7 @@ def get_structured_chat_model(schema: Any) -> Runnable:
 @lru_cache(maxsize=1)
 def get_embeddings() -> Embeddings:
     s = get_settings()
-    provider: ProviderName = s.resolve_provider()
+    provider = s.embed_provider or s.resolve_provider()
     logger.info("EMBED_FACTORY | provider=%s", provider)
 
     if provider == "gemini":
@@ -285,6 +285,12 @@ def get_embeddings() -> Embeddings:
         embed_model = s.effective_ollama_embed_model
         logger.info("EMBED_FACTORY | ollama embedding model: %s", embed_model)
         return OllamaEmbeddings(model=embed_model, base_url=s.ollama_base_url)
+
+    if provider == "huggingface":
+        from langchain_huggingface import HuggingFaceEmbeddings
+
+        logger.info("EMBED_FACTORY | using local HF model '%s'", s.local_embed_model)
+        return HuggingFaceEmbeddings(model_name=s.local_embed_model)
 
     # Grok ships no embedding API. Fall back to a local HuggingFace model.
     # First load needs internet (or a pre-warmed HF cache); subsequent runs

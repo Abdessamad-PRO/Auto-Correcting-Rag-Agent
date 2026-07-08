@@ -13,6 +13,7 @@ from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ProviderName = Literal["gemini", "openai", "grok", "ollama"]
+EmbeddingProviderName = Literal["gemini", "openai", "ollama", "huggingface"]
 
 
 class Settings(BaseSettings):
@@ -31,6 +32,12 @@ class Settings(BaseSettings):
     #: remote API keys are present. Remote providers (if their keys are set)
     #: still appear later in the fallback chain.
     local: bool = False
+
+    # --- Embeddings provider override (optional) --------------------------
+    embed_provider: Optional[EmbeddingProviderName] = Field(
+        default=None,
+        validation_alias=AliasChoices("EMBED_PROVIDER", "EMBEDDINGS_PROVIDER"),
+    )
 
     # --- Provider credentials --------------------------------------------
     gemini_api_key: Optional[str] = None

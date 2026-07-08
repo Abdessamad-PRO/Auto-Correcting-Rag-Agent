@@ -34,13 +34,15 @@ class VectorRepository:
         # vectors never clash on dimension when you switch models. Chroma
         # locks a collection to its first embedding's dimensionality; with
         # this scheme the next switch just creates a sibling collection.
-        provider = settings.resolve_provider()
+        provider = settings.embed_provider or settings.resolve_provider()
         if provider == "ollama":
             embed_id = settings.effective_ollama_embed_model
         elif provider == "gemini":
             embed_id = settings.gemini_embed_model
         elif provider == "openai":
             embed_id = settings.openai_embed_model
+        elif provider == "huggingface":
+            embed_id = settings.local_embed_model
         else:
             embed_id = settings.local_embed_model
         self._collection = (
