@@ -40,6 +40,40 @@ const NODE_LABEL: Record<string, string> = {
       <section
         class="flex-1 flex flex-col bg-surface-container-lowest overflow-hidden relative min-w-0 min-h-0"
       >
+        <div class="px-margin-edge pt-4 pb-2 border-b border-outline-variant bg-surface">
+          <div class="flex items-center gap-2 flex-wrap">
+            @for (s of session.sessions(); track s.id) {
+              <button
+                type="button"
+                (click)="session.switchSession(s.id)"
+                class="session-tab"
+                [class.active]="s.isActive"
+              >
+                <span class="font-technical-data text-technical-data truncate max-w-[240px]">
+                  {{ s.label }}
+                </span>
+                @if (s.isStreaming) {
+                  <span class="ml-2 w-2 h-2 rounded-full bg-tertiary-container animate-pulse"></span>
+                } @else if (s.hasAnswer) {
+                  <span class="material-symbols-outlined ml-2 text-sm text-tertiary-fixed-dim">
+                    check_circle
+                  </span>
+                }
+              </button>
+            }
+
+            <button
+              type="button"
+              class="session-tab add"
+              (click)="session.newSession()"
+              aria-label="New session"
+            >
+              <span class="material-symbols-outlined text-sm">add</span>
+              <span class="font-label-caps text-label-caps uppercase">New</span>
+            </button>
+          </div>
+        </div>
+
         <app-hitl-banner />
 
         <div
@@ -186,6 +220,31 @@ const NODE_LABEL: Record<string, string> = {
       border-radius: 9999px;
       background: var(--color-tertiary-container);
       animation: pulse 1.4s ease-in-out infinite;
+    }
+    .session-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border: 1px solid var(--color-outline-variant);
+      background: transparent;
+      color: var(--color-on-surface-variant);
+      transition: background-color 150ms, border-color 150ms, color 150ms;
+      max-width: 320px;
+    }
+    .session-tab:hover {
+      background: var(--color-surface-container-high);
+      color: var(--color-primary);
+    }
+    .session-tab.active {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      background: var(--color-surface-container-high);
+      font-weight: 700;
+    }
+    .session-tab.add {
+      border-style: dashed;
+      color: var(--color-tertiary-fixed-dim);
     }
     @keyframes pulse {
       0%, 100% { opacity: 0.4; transform: scale(0.85); }

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, output } from '@angular/core';
+import { Router } from '@angular/router';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
 import { AgentSessionStore } from '../../core/state/agent-session.store';
@@ -133,10 +134,12 @@ import { AgentSessionStore } from '../../core/state/agent-session.store';
 })
 export class SideNavComponent {
   private readonly session = inject(AgentSessionStore);
+  private readonly router = inject(Router);
   readonly linkClicked = output<void>();
 
   protected newSession(): void {
-    this.session.reset();
+    this.session.newSession();
+    void this.router.navigateByUrl('/workspace');
     this.linkClicked.emit();
   }
 }

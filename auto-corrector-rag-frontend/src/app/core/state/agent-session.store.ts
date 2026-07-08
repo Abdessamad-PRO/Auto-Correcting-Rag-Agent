@@ -34,6 +34,10 @@ export class AgentSessionStore {
   private readonly api = inject(AgentApiService);
   private readonly sse = inject(SseService);
 
+  private readonly sessionOrder = signal<string[]>([]);
+  private readonly sessionSnapshots = signal<Record<string, AgentSessionSnapshot>>({});
+  readonly activeSessionId = signal<string | null>(null);
+
   /* ---------------------- Reactive state (signals) ------------------- */
   readonly threadId = signal<string | null>(null);
   readonly question = signal<string>('');
@@ -62,6 +66,26 @@ export class AgentSessionStore {
   readonly hasSession = computed(() => this.threadId() !== null);
   readonly hasAnswer = computed(() => !!(this.finalAnswer() || this.generation()));
   readonly answer = computed(() => this.finalAnswer() ?? this.generation());
+
+  readonly sessions = computed(() => {
+    const order = this.sessionOrder();
+    const snaps = this.sessionSnapshots();
+    const active = this.activeSessionId();
+    return order.map((id) => {
+      const s = snaps[id];
+      const q = s?.question?.trim();
+      const label =
+        q && q.length > 0 ? (q.length > 48 ? `${q.slice(0, 48)}…` : q) : `Session ${id.slice(0, 6)}`;
+      return {
+        id,
+        label,
+        isActive: id === active,
+        isStreaming: !!s?.isStreaming,
+        hasAnswer: !!(s?.finalAnswer || s?.generation),
+        updatedAt: s?.updatedAt ?? Date.now(),
+      };
+    });
+  });
 
   readonly citations = computed<Citation[]>(() => {
     const all = [...this.gradedDocuments(), ...this.webResults()];
@@ -92,9 +116,15 @@ export class AgentSessionStore {
   /* ---------------------- Streaming subscription --------------------- */
   private streamSub?: Subscription;
 
+  constructor() {
+    if (this.sessionOrder().length === 0) {
+      this.newSession();
+    }
+  }
+
   /** Kick off a new streaming research session. */
   run(question: string, variant: PromptVariant = 'A'): void {
-    this.reset();
+    this.resetActive();
     this.question.set(question);
     this.promptVariant.set(variant);
     this.isStreaming.set(true);
@@ -135,7 +165,29 @@ export class AgentSessionStore {
     this.isStreaming.set(false);
   }
 
-  reset(): void {
+  newSession(): string {
+    this.saveActiveSnapshot();
+    this.cancel();
+    const id = this.newId();
+    this.sessionOrder.update((prev) => [...prev, id]);
+    this.sessionSnapshots.update((prev) => ({ ...prev, [id]: emptySnapshot(id) }));
+    this.activeSessionId.set(id);
+    this.applySnapshot(emptySnapshot(id));
+    return id;
+  }
+
+  switchSession(id: string): void {
+    if (!id || id === this.activeSessionId()) return;
+    const snaps = this.sessionSnapshots();
+    const target = snaps[id];
+    if (!target) return;
+    this.saveActiveSnapshot();
+    this.cancel();
+    this.activeSessionId.set(id);
+    this.applySnapshot({ ...target, isStreaming: false, updatedAt: Date.now() });
+  }
+
+  resetActive(): void {
     this.cancel();
     this.threadId.set(null);
     this.plan.set(null);
@@ -153,6 +205,7 @@ export class AgentSessionStore {
     this.interrupt.set(null);
     this.humanFeedback.set(null);
     this.error.set(null);
+    this.saveActiveSnapshot();
   }
 
   /** Replace state from a non-streaming sync response (e.g. after resume). */
@@ -169,6 +222,7 @@ export class AgentSessionStore {
     this.humanFeedback.set(resp.human_feedback ?? null);
     this.error.set(resp.error ?? null);
     this.isPaused.set(resp.interrupted);
+    this.saveActiveSnapshot();
   }
 
   /* ---------------------- Internal helpers --------------------------- */
@@ -177,6 +231,7 @@ export class AgentSessionStore {
       case 'meta': {
         const d = data as { thread_id: string };
         if (d?.thread_id) this.threadId.set(d.thread_id);
+        this.saveActiveSnapshot();
         break;
       }
       case 'update': {
@@ -189,6 +244,7 @@ export class AgentSessionStore {
         this.interrupt.set(d.interrupt);
         this.isPaused.set(true);
         this.isStreaming.set(false);
+        this.saveActiveSnapshot();
         break;
       }
       case 'final': {
@@ -196,10 +252,12 @@ export class AgentSessionStore {
         if (d?.final_answer) this.finalAnswer.set(d.final_answer);
         if (d?.error) this.error.set(d.error);
         this.isStreaming.set(false);
+        this.saveActiveSnapshot();
         break;
       }
       case 'error': {
         this.error.set('SSE connection error');
+        this.saveActiveSnapshot();
         break;
       }
     }
@@ -239,6 +297,7 @@ export class AgentSessionStore {
         break;
     }
     if (u.error) this.error.set(u.error);
+    this.saveActiveSnapshot();
   }
 
   private formatCitation(d: DocumentPreview): string {
@@ -246,4 +305,115 @@ export class AgentSessionStore {
     const year = d.year ? ` (${d.year})` : '';
     return `${title}${year}`;
   }
+
+  private saveActiveSnapshot(): void {
+    const id = this.activeSessionId();
+    if (!id) return;
+    const snap = this.snapshotFromSignals(id);
+    this.sessionSnapshots.update((prev) => ({ ...prev, [id]: snap }));
+  }
+
+  private snapshotFromSignals(id: string): AgentSessionSnapshot {
+    return {
+      id,
+      threadId: this.threadId(),
+      question: this.question(),
+      promptVariant: this.promptVariant(),
+      plan: this.plan(),
+      generation: this.generation(),
+      finalAnswer: this.finalAnswer(),
+      documents: [...this.documents()],
+      gradedDocuments: [...this.gradedDocuments()],
+      webResults: [...this.webResults()],
+      trace: [...this.trace()],
+      loopStep: this.loopStep(),
+      relevanceDecision: this.relevanceDecision(),
+      relevantCount: this.relevantCount(),
+      totalGraded: this.totalGraded(),
+      isStreaming: this.isStreaming(),
+      isPaused: this.isPaused(),
+      interrupt: this.interrupt(),
+      humanFeedback: this.humanFeedback(),
+      error: this.error(),
+      updatedAt: Date.now(),
+    };
+  }
+
+  private applySnapshot(s: AgentSessionSnapshot): void {
+    this.threadId.set(s.threadId);
+    this.question.set(s.question);
+    this.promptVariant.set(s.promptVariant);
+    this.plan.set(s.plan);
+    this.generation.set(s.generation);
+    this.finalAnswer.set(s.finalAnswer);
+    this.documents.set(s.documents);
+    this.gradedDocuments.set(s.gradedDocuments);
+    this.webResults.set(s.webResults);
+    this.trace.set(s.trace);
+    this.loopStep.set(s.loopStep);
+    this.relevanceDecision.set(s.relevanceDecision);
+    this.relevantCount.set(s.relevantCount);
+    this.totalGraded.set(s.totalGraded);
+    this.isStreaming.set(s.isStreaming);
+    this.isPaused.set(s.isPaused);
+    this.interrupt.set(s.interrupt);
+    this.humanFeedback.set(s.humanFeedback);
+    this.error.set(s.error);
+  }
+
+  private newId(): string {
+    const anyCrypto = globalThis.crypto as { randomUUID?: () => string } | undefined;
+    if (anyCrypto?.randomUUID) return anyCrypto.randomUUID();
+    return `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
+  }
+}
+
+interface AgentSessionSnapshot {
+  id: string;
+  threadId: string | null;
+  question: string;
+  promptVariant: PromptVariant;
+  plan: string | null;
+  generation: string | null;
+  finalAnswer: string | null;
+  documents: DocumentPreview[];
+  gradedDocuments: DocumentPreview[];
+  webResults: DocumentPreview[];
+  trace: TraceUpdate[];
+  loopStep: number;
+  relevanceDecision: string | null;
+  relevantCount: number;
+  totalGraded: number;
+  isStreaming: boolean;
+  isPaused: boolean;
+  interrupt: InterruptEvent['interrupt'] | null;
+  humanFeedback: string | null;
+  error: string | null;
+  updatedAt: number;
+}
+
+function emptySnapshot(id: string): AgentSessionSnapshot {
+  return {
+    id,
+    threadId: null,
+    question: '',
+    promptVariant: 'A',
+    plan: null,
+    generation: null,
+    finalAnswer: null,
+    documents: [],
+    gradedDocuments: [],
+    webResults: [],
+    trace: [],
+    loopStep: 0,
+    relevanceDecision: null,
+    relevantCount: 0,
+    totalGraded: 0,
+    isStreaming: false,
+    isPaused: false,
+    interrupt: null,
+    humanFeedback: null,
+    error: null,
+    updatedAt: Date.now(),
+  };
 }

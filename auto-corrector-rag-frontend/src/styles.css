@@ -13,56 +13,63 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* === Material 3 token palette ========================================== */
-  --color-on-error-container: #ffdad6;
-  --color-tertiary: #ffffff;
-  --color-inverse-primary: #5d5f5f;
-  --color-on-surface: #e5e2e1;
-  --color-on-primary-fixed: #1a1c1c;
-  --color-secondary-fixed-dim: #bec6e0;
-  --color-secondary-fixed: #dae2fd;
-  --color-error-container: #93000a;
-  --color-primary-fixed: #e2e2e2;
-  --color-surface-tint: #c6c6c7;
-  --color-on-secondary-fixed-variant: #3f465c;
-  --color-surface-variant: #353434;
-  --color-surface-dim: #141313;
-  --color-tertiary-container: #c4e7ff;
-  --color-secondary: #bec6e0;
-  --color-error: #ffb4ab;
-  --color-on-tertiary-container: #006c93;
-  --color-primary: #ffffff;
-  --color-on-secondary: #283044;
-  --color-on-surface-variant: #c4c7c8;
-  --color-surface-container-lowest: #0e0e0e;
-  --color-inverse-surface: #e5e2e1;
-  --color-background: #141313;
-  --color-outline: #8e9192;
-  --color-on-tertiary: #00354a;
-  --color-on-primary-fixed-variant: #454747;
-  --color-surface-container-low: #1c1b1b;
-  --color-surface-container-highest: #353434;
-  --color-secondary-container: #3f465c;
-  --color-surface: #141313;
-  --color-inverse-on-surface: #313030;
-  --color-on-background: #e5e2e1;
-  --color-on-error: #690005;
-  --color-on-secondary-container: #adb4ce;
-  --color-tertiary-fixed: #c4e7ff;
-  --color-outline-variant: #444748;
-  --color-on-primary-container: #636565;
-  --color-tertiary-fixed-dim: #7bd0ff;
-  --color-surface-bright: #3a3939;
-  --color-surface-container: #201f1f;
-  --color-surface-container-high: #2a2a2a;
-  --color-on-secondary-fixed: #131b2e;
-  --color-on-tertiary-fixed-variant: #004c69;
-  --color-primary-fixed-dim: #c6c6c7;
-  --color-on-tertiary-fixed: #001e2c;
-  --color-primary-container: #e2e2e2;
-  --color-on-primary: #2f3131;
+  /* === Palette de Couleurs Vives, Claires et Lumineuses (Style Liesse / Vibrant) === */
+  --color-background: #f7f9fc;               /* Fond général très clair, lumineux */
+  --color-surface: #ffffff;                  /* Surfaces des cartes et panneaux en blanc pur */
+  --color-surface-bright: #ffffff;
+  --color-on-background: #1e293b;            /* Texte principal en bleu-noir très lisible */
+  --color-on-surface: #334155;               /* Texte secondaire */
+  
+  /* Couleurs d'accentuation vives */
+  --color-primary: #3b82f6;                  /* Bleu Roi Éclatant (Énergie et clarté) */
+  --color-on-primary: #ffffff;               /* Texte blanc sur fond bleu */
+  
+  --color-secondary: #10b981;                /* Vert Émeraude Vif (Succès, vitalité) */
+  --color-on-secondary: #ffffff;
+  
+  --color-tertiary: #f59e0b;                 /* Jaune Ambre / Or (Lumière, joie) */
+  --color-tertiary-container: #dbeafe;       /* Fond bleu ciel léger pour les alertes */
+  --color-on-tertiary-container: #1e40af;
+  
+  /* États de conteneurs clairs */
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f1f5f9;    /* Gris très clair pour les blocs de code/citations */
+  --color-surface-container: #e2e8f0;
+  --color-surface-container-high: #cbd5e1;
+  --color-surface-container-highest: #94a3b8;
+  --color-surface-dim: #e2e8f0;
+  
+  /* Éléments de structure et bordures */
+  --color-outline: #64748b;                  /* Bordures bien nettes mais claires */
+  --color-outline-variant: #cbd5e1;          /* Séparateurs discrets */
+  --color-surface-variant: #f8fafc;
+  --color-on-surface-variant: #475569;
+  
+  /* Erreurs et alertes */
+  --color-error: #ef4444;                    /* Rouge vif */
+  --color-error-container: #fee2e2;          /* Fond rouge très clair */
+  --color-on-error: #ffffff;
+  --color-on-error-container: #991b1b;
 
-  /* === Spacing tokens (named scale used in the design) =================== */
+  /* Reste de la configuration fixe du projet (inchangée pour préserver le fonctionnement) */
+  --color-inverse-primary: #94a3b8;
+  --color-inverse-surface: #1e293b;
+  --color-inverse-on-surface: #f8fafc;
+  --color-primary-fixed: #3b82f6;
+  --color-primary-fixed-dim: #60a5fa;
+  --color-on-primary-fixed: #ffffff;
+  --color-on-primary-fixed-variant: #1e3a8a;
+  --color-secondary-fixed: #10b981;
+  --color-secondary-fixed-dim: #34d399;
+  --color-on-secondary-fixed: #ffffff;
+  --color-on-secondary-fixed-variant: #065f46;
+  --color-tertiary-fixed: #f59e0b;
+  --color-tertiary-fixed-dim: #fbbf24;
+  --color-on-tertiary-fixed: #ffffff;
+  --color-on-tertiary-fixed-variant: #78350f;
+  --color-surface-tint: #3b82f6;
+
+  /* === Spacing tokens (Garder à l'identique pour ne pas casser la mise en page) === */
   --spacing-unit: 4px;
   --spacing-margin-edge: 24px;
   --spacing-panel-padding: 12px;
@@ -70,7 +77,7 @@
   --spacing-stack-loose: 24px;
   --spacing-stack-compact: 8px;
 
-  /* === Typography ======================================================== */
+  /* === Typography (Garder à l'identique) === */
   --font-technical-data: 'Archivo Narrow', system-ui, sans-serif;
   --font-headline-md: 'Source Serif 4', serif;
   --font-display-lg: 'Source Serif 4', serif;
@@ -115,7 +122,6 @@
   --text-label-caps--letter-spacing: 0.08em;
   --text-label-caps--font-weight: 600;
 
-  /* === Border radii (sharp by design) ==================================== */
   --radius-DEFAULT: 0.25rem;
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
